@@ -474,7 +474,7 @@ const TarotReading = ({ user, fetchUserData }) => {
                 {error && <div className="mb-4"><ErrorDisplay message={error}/></div>}
                 {loading && <div className="flex justify-center"><LoadingSpinner/></div>}
                 <div className="space-y-5">
-                    {[['single', 'Simple Reading (1 Card)', 1], ['three-card', 'Three-Card Spread', 3], ['celtic-cross', 'Celtic Cross', 10]].map(([type, label, count]) => (
+                    {[['single', 'Simple Reading (1 Card)', 1], ['three-card', 'Three-Card Spread', 3], ['celtic-cross', 'Celtic Cross', 10]].map(([type, label, count], i) => (
                         <motion.button key={type} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.15 }} onClick={() => drawCards(count, type)} disabled={loading || fullDeck.length === 0} className="w-full bg-card border border-border p-4 rounded-xl hover:border-primary text-card-foreground font-semibold transition-all hover:bg-foreground/5 disabled:opacity-50">
                             {label}
                         </motion.button>
