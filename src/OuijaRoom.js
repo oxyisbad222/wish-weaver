@@ -19,21 +19,43 @@ const OuijaBoard = ({ room, user, db }) => {
     const boardRef = useRef(null);
 
     useEffect(() => {
-        if (!db || room.gamePhase !== 'session' || !room.guidingMessage) return;
+        if (!db || room.gamePhase !== 'session' || !room.guidingMessage) {
+            if (planchetteRef.current) {
+                planchetteRef.current.style.transition = 'transform 1s ease-in-out';
+            }
+            return;
+        };
 
         const targetChar = room.guidingMessage[room.guidingMessageIndex || 0];
         if (!targetChar) return;
 
-        const targetElement = document.getElementById(`char-${targetChar.toUpperCase()}`);
+        let targetElement;
+        if (targetChar === ' ') {
+            // For spaces, we can target a neutral element like the board itself for a pause
+            targetElement = boardRef.current; 
+        } else {
+            targetElement = document.getElementById(`char-${targetChar.toUpperCase()}`);
+        }
+
         if (!targetElement || !boardRef.current || !planchetteRef.current) return;
 
         const boardRect = boardRef.current.getBoundingClientRect();
         const targetRect = targetElement.getBoundingClientRect();
+        
+        let targetX, targetY;
 
-        const targetX = targetRect.left + targetRect.width / 2 - boardRect.left;
-        const targetY = targetRect.top + targetRect.height / 2 - boardRect.top;
+        if (targetChar === ' ') {
+            // Pause in the center for a space
+            targetX = boardRect.width / 2 - (planchetteRef.current.offsetWidth / 2);
+            targetY = boardRect.height / 2 - (planchetteRef.current.offsetHeight / 2);
+        } else {
+            targetX = targetRect.left + targetRect.width / 2 - boardRect.left - (planchetteRef.current.offsetWidth / 2);
+            targetY = targetRect.top + targetRect.height / 2 - boardRect.top - (planchetteRef.current.offsetHeight / 2);
+        }
 
-        // Host is responsible for advancing the message
+        planchetteRef.current.style.transition = 'transform 1s cubic-bezier(0.4, 0, 0.2, 1)';
+        planchetteRef.current.style.transform = `translate(${targetX}px, ${targetY}px)`;
+
         if (room.host.uid === user.uid) {
             const timeoutId = setTimeout(async () => {
                 const roomRef = doc(db, 'ouijaRooms', room.id);
@@ -42,8 +64,8 @@ const OuijaBoard = ({ room, user, db }) => {
                 if (nextIndex >= room.guidingMessage.length) {
                     await updateDoc(roomRef, {
                         gamePhase: 'idle',
-                        guidingMessage: '',
                         currentMessage: room.guidingMessage,
+                        guidingMessage: '',
                         guidingMessageIndex: 0,
                         focusMessages: [],
                         votes: {},
@@ -52,11 +74,12 @@ const OuijaBoard = ({ room, user, db }) => {
                 } else {
                     await updateDoc(roomRef, { guidingMessageIndex: nextIndex });
                 }
-            }, 1500); // Faster letter selection
+            }, 1200); // 1s travel time + 200ms hover/pause
             return () => clearTimeout(timeoutId);
         }
 
     }, [room.gamePhase, room.guidingMessage, room.guidingMessageIndex, room.host.uid, user.uid, room.id, db]);
+
 
     return (
         <div ref={boardRef} className="relative w-full max-w-3xl mx-auto bg-slate-900/50 p-4 sm:p-8 rounded-3xl shadow-2xl border-2 border-purple-500/30 select-none aspect-[16/10] flex flex-col justify-center">
@@ -72,22 +95,34 @@ const OuijaBoard = ({ room, user, db }) => {
             <div className="absolute bottom-4 sm:bottom-8 left-1/2 -translate-x-1/2 text-xl sm:text-2xl font-serif text-primary" id="char-GOODBYE">GOODBYE</div>
 
             <div className="absolute bottom-[20%] left-1/2 -translate-x-1/2 w-4/5 h-12 sm:h-16 bg-black/30 rounded-lg p-2 text-center text-white font-serif text-base sm:text-xl overflow-y-auto flex items-center justify-center">
-                <p>{room.gamePhase === 'session' ? room.guidingMessage.substring(0, room.guidingMessageIndex) : room.currentMessage}</p>
+                <AnimatePresence>
+                {room.guidingMessage.substring(0, room.guidingMessageIndex || 0).split('').map((char, i) => (
+                    <motion.span
+                        key={i}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.5 }}
+                    >
+                        {char}
+                    </motion.span>
+                ))}
+                </AnimatePresence>
+                {room.gamePhase !== 'session' && <p>{room.currentMessage}</p>}
             </div>
 
             <motion.div
                 ref={planchetteRef}
-                className="absolute top-1/2 left-1/2"
-                style={{ x: '-50%', y: '-50%' }}
-                animate={room.gamePhase === 'session' ? {
-                    filter: ['brightness(1)', 'brightness(1.5)', 'brightness(1)'],
-                    scale: [1, 1.05, 1],
-                } : {}}
-                transition={room.gamePhase === 'session' ? {
-                    duration: 1.5, // Faster animation
+                className="absolute"
+                style={{ top: '50%', left: '50%', x: '-50%', y: '-50%' }}
+                animate={{
+                    filter: room.gamePhase === 'session' ? ['brightness(1)', 'brightness(1.8)', 'brightness(1)'] : 'brightness(1)',
+                    scale: room.gamePhase === 'session' ? [1, 1.1, 1] : 1,
+                }}
+                transition={{
+                    duration: 1.2,
                     repeat: Infinity,
                     ease: "easeInOut"
-                } : {}}
+                }}
             >
                  <Ghost className="w-14 h-14 sm:w-16 sm:h-16 text-white drop-shadow-lg" />
             </motion.div>
@@ -129,7 +164,6 @@ const RoomLobby = ({ onJoinRoom, db, user, userData, setNotification }) => {
             participantUids: [user.uid],
             createdAt: serverTimestamp(),
             currentMessage: 'The veil is thin...',
-            planchette: { x: 200, y: 150 },
             gamePhase: 'idle',
             focusMessages: [],
             votes: {},
@@ -363,7 +397,7 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
         });
 
         return () => unsubscribe();
-    }, [currentRoomId, user.uid, userData.username, userData.avatarSeed, db, showNotification]);
+    }, [currentRoomId, user.uid, userData, db, showNotification]);
 
     useEffect(() => {
         if (!currentRoom || currentRoom.host.uid !== user.uid || !db) return;
@@ -371,12 +405,11 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
         const roomRef = doc(db, 'ouijaRooms', currentRoom.id);
         const participantsCount = currentRoom.participants?.length || 0;
 
-        // All players ready, start session
         if (currentRoom.gamePhase === 'idle' && Object.keys(currentRoom.ready || {}).length === participantsCount && participantsCount > 0) {
             const spiritResponse = spiritResponses[Math.floor(Math.random() * spiritResponses.length)];
             updateDoc(roomRef, {
                 gamePhase: 'session',
-                guidingMessage: spiritResponse.toUpperCase().replace(/ /g, ''),
+                guidingMessage: spiritResponse.toUpperCase(),
                 guidingMessageIndex: 0
             });
         }
@@ -396,7 +429,7 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
                         spiritResponse = spiritResponses[Math.floor(Math.random() * spiritResponses.length)];
                     } while (spiritResponse === currentRoom.currentMessage);
 
-                    updateDoc(roomRef, { gamePhase: 'session', guidingMessage: spiritResponse.toUpperCase().replace(/ /g, ''), guidingMessageIndex: 0 });
+                    updateDoc(roomRef, { gamePhase: 'session', guidingMessage: spiritResponse.toUpperCase(), guidingMessageIndex: 0 });
                  }
             }
         }
