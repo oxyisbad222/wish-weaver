@@ -140,29 +140,47 @@ const Button = ({ onClick, children, variant = 'primary', className = '', disabl
   return <button onClick={onClick} className={`${baseClasses} ${variants[variant]} ${className}`} disabled={disabled}>{children}</button>;
 };
 
-const Login = () => {
-    const handleGoogleLogin = async (isSignUp) => {
+const Login = ({ setNotification }) => {
+    const handleGoogleSignUp = async () => {
         try {
             const result = await signInWithPopup(auth, provider);
             const user = result.user;
             const userDocRef = doc(db, "users", user.uid);
             const userDoc = await getDoc(userDocRef);
 
-            // If it's a new user (document doesn't exist), create it with needsSetup: true
             if (!userDoc.exists()) {
                 await setDoc(userDocRef, {
                     uid: user.uid,
                     email: user.email,
                     photoURL: user.photoURL,
                     googleDisplayName: user.displayName,
-                    needsSetup: true, // This triggers the AccountSetup component
+                    needsSetup: true,
                     createdAt: new Date().toISOString(),
                 });
             }
-            // If it's an existing user signing in, we just let the onAuthStateChanged handle it.
-            // The needsSetup flag will be read from their existing document.
+            // If user doc already exists, onAuthStateChanged will just log them in.
         } catch (error) {
             console.error("Authentication Error:", error);
+            setNotification('Sign up failed. Please try again.', 'error');
+        }
+    };
+
+    const handleGoogleSignIn = async () => {
+        try {
+            const result = await signInWithPopup(auth, provider);
+            const user = result.user;
+            const userDocRef = doc(db, "users", user.uid);
+            const userDoc = await getDoc(userDocRef);
+
+            if (!userDoc.exists()) {
+                // User tried to sign in but doesn't have an account in our DB.
+                await signOut(auth);
+                setNotification('No account found. Please sign up first.', 'error');
+            }
+            // If user doc exists, onAuthStateChanged will log them in.
+        } catch (error) {
+            console.error("Authentication Error:", error);
+            setNotification('Sign in failed. Please try again.', 'error');
         }
     };
 
@@ -171,6 +189,7 @@ const Login = () => {
             await signInAnonymously(auth);
         } catch (error) {
             console.error("Anonymous Authentication Error:", error);
+            setNotification('Guest login failed. Please try again.', 'error');
         }
     };
 
@@ -199,11 +218,11 @@ const Login = () => {
                 transition={{ delay: 0.8, type: 'spring' }}
                 className="flex flex-col space-y-4 w-full max-w-xs"
             >
-                <Button onClick={() => handleGoogleLogin(true)} variant="primary">
+                <Button onClick={handleGoogleSignUp} variant="primary">
                     <UserPlus size={18}/>
                     <span>Sign Up with Google</span>
                 </Button>
-                 <Button onClick={() => handleGoogleLogin(false)} variant="secondary">
+                 <Button onClick={handleGoogleSignIn} variant="secondary">
                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56,12.25C22.56,11.47 22.49,10.72 22.36,10H12.27V14.1H18.1C17.84,15.55 17.03,16.8 15.84,17.64V20.25H19.45C21.45,18.44 22.56,15.63 22.56,12.25Z" /><path d="M12.27,23C15.05,23 17.4,22.04 19.03,20.59L15.42,17.98C14.49,18.63 13.46,19 12.27,19C9.86,19 7.8,17.43 7,15.21H3.29V17.9C4.93,20.99 8.3,23 12.27,23Z" /><path d="M7,15.21C6.75,14.46 6.6,13.65 6.6,12.8C6.6,11.95 6.75,11.14 7,10.39V7.69H3.29C2.48,9.22 2,10.95 2,12.8C2,14.65 2.48,16.38 3.29,17.9L7,15.21Z" /><path d="M12.27,6.6C13.55,6.6 14.63,7.03 15.53,7.86L18.51,4.88C16.88,3.38 14.78,2.5 12.27,2.5C8.3,2.5 4.93,4.51 3.29,7.69L7,10.39C7.8,8.17 9.86,6.6 12.27,6.6Z" /></svg>
                     <span>Sign In with Google</span>
                 </Button>
@@ -365,7 +384,7 @@ const Horoscope = ({ zodiac }) => {
     );
 };
 
-const TarotReading = ({ user, fetchUserData }) => {
+const TarotReading = ({ user, showNotification }) => {
     const [fullDeck, setFullDeck] = useState([]);
     const [spreadType, setSpreadType] = useState(null);
     const [cards, setCards] = useState([]);
@@ -374,7 +393,6 @@ const TarotReading = ({ user, fetchUserData }) => {
     const [selectedCard, setSelectedCard] = useState(null);
     const [readingTitle, setReadingTitle] = useState("");
     const [isSaving, setIsSaving] = useState(false);
-    const [notification, setNotification] = useState('');
 
     useEffect(() => {
         const fetchDeck = async () => {
@@ -415,11 +433,10 @@ const TarotReading = ({ user, fetchUserData }) => {
     
     const handleSaveReading = async () => {
         if (!readingTitle) {
-            setNotification("Please enter a title for your reading.");
-            setTimeout(() => setNotification(''), 3000);
+            showNotification("Please enter a title for your reading.", "error");
             return;
         }
-        setNotification('Saving...');
+        showNotification('Saving...');
         const userDocRef = doc(db, "users", user.uid);
         const readingToSave = {
             title: readingTitle,
@@ -435,22 +452,18 @@ const TarotReading = ({ user, fetchUserData }) => {
         };
         try {
             await updateDoc(userDocRef, { readings: arrayUnion(readingToSave) });
-            setNotification("Reading saved successfully!");
-            if (fetchUserData) await fetchUserData(user.uid);
+            showNotification("Reading saved successfully!");
             setIsSaving(false);
             setReadingTitle("");
         } catch (err) {
             console.error("Error saving reading:", err);
-            setNotification("Error: Could not save reading.");
-        } finally {
-            setTimeout(() => setNotification(''), 3000);
+            showNotification("Error: Could not save reading.", "error");
         }
     };
     
     const openSaveModal = () => {
         if (user.isAnonymous) {
-            setNotification('Guests cannot save readings.');
-            setTimeout(() => setNotification(''), 3000);
+            showNotification('Guests cannot save readings.', 'error');
             return;
         }
         setIsSaving(true);
@@ -493,7 +506,6 @@ const TarotReading = ({ user, fetchUserData }) => {
 
     return (
         <div className="p-4">
-            <Notification message={notification} />
             <AnimatePresence>
                 {selectedCard && interpretation && (
                     <Modal onClose={() => setSelectedCard(null)}>
@@ -563,12 +575,11 @@ const TarotReading = ({ user, fetchUserData }) => {
     );
 };
 
-const Profile = ({ user, userData, fetchUserData, navigate }) => {
+const Profile = ({ user, userData, showNotification }) => {
     const [preferredName, setPreferredName] = useState(userData?.preferredName || '');
     const [pronouns, setPronouns] = useState(userData?.pronouns || '');
     const [avatarSeed, setAvatarSeed] = useState(userData?.avatarSeed || '');
     const [zodiac, setZodiac] = useState(userData?.zodiac || 'Aries');
-    const [notification, setNotification] = useState('');
     const [showInfo, setShowInfo] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
@@ -577,27 +588,23 @@ const Profile = ({ user, userData, fetchUserData, navigate }) => {
 
     const handleSave = async () => {
         if (user.isAnonymous) {
-            setNotification("Guests can't save profiles.");
-            setTimeout(() => setNotification(''), 3000);
+            showNotification("Guests can't save profiles.", "error");
             return;
         }
-        setNotification('Saving...');
+        showNotification('Saving...');
         const userDocRef = doc(db, "users", user.uid);
         try {
             await updateDoc(userDocRef, { preferredName, pronouns, avatarSeed, zodiac });
-            setNotification('Profile saved successfully!');
+            showNotification('Profile saved successfully!');
         } catch (error) {
             console.error("Error saving profile:", error);
-            setNotification('Failed to save profile.');
-        } finally {
-            setTimeout(() => setNotification(''), 3000);
+            showNotification('Failed to save profile.', 'error');
         }
     };
 
     const handleDeleteAccount = async () => {
         if (deleteConfirmationText !== 'delete my account') {
-            setNotification("Please type the confirmation phrase correctly.");
-            setTimeout(() => setNotification(''), 3000);
+            showNotification("Please type the confirmation phrase correctly.", "error");
             return;
         }
 
@@ -612,17 +619,16 @@ const Profile = ({ user, userData, fetchUserData, navigate }) => {
             await batch.commit();
             await deleteUser(auth.currentUser);
 
-            setNotification('Account deleted successfully.');
+            showNotification('Account deleted successfully.');
             setShowDeleteModal(false);
         } catch (error) {
             console.error("Error deleting account:", error);
-            setNotification(`Failed to delete account. Please log out and log back in to try again. Error: ${error.message}`);
+            showNotification(`Failed to delete account. Error: ${error.message}`, 'error');
         }
     };
 
     return (
         <div className="bg-card p-6 rounded-2xl shadow-lg max-w-lg mx-auto border border-border">
-            <Notification message={notification} />
             <AnimatePresence>
                 {showInfo && (
                     <Modal onClose={() => setShowInfo(false)}>
@@ -725,9 +731,8 @@ const PastReadings = ({ readings }) => {
     );
 };
 
-const CommunityHub = ({ user, userData, fetchUserData, setChattingWith }) => {
+const CommunityHub = ({ user, userData, setChattingWith, showNotification }) => {
     const [activeTab, setActiveTab] = useState('affirmations');
-    const [notification, setNotification] = useState('');
 
     const TabButton = ({ tabName, label }) => (
         <button
@@ -740,7 +745,6 @@ const CommunityHub = ({ user, userData, fetchUserData, setChattingWith }) => {
 
     return (
         <div className="p-4 sm:p-6 max-w-4xl mx-auto">
-            <Notification message={notification} />
             <h2 className="text-3xl font-serif mb-6 text-center text-foreground">Community Hub</h2>
             <div className="flex justify-center space-x-2 mb-6">
                 <TabButton tabName="affirmations" label="Affirmations" />
@@ -755,9 +759,9 @@ const CommunityHub = ({ user, userData, fetchUserData, setChattingWith }) => {
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2 }}
                 >
-                    {activeTab === 'affirmations' && <AffirmationWall user={user} userData={userData} setNotification={setNotification} />}
-                    {activeTab === 'friends' && <FriendsList user={user} userData={userData} fetchUserData={fetchUserData} setNotification={setNotification} setChattingWith={setChattingWith} />}
-                    {activeTab === 'find' && <FindFriends user={user} userData={userData} setNotification={setNotification} />}
+                    {activeTab === 'affirmations' && <AffirmationWall user={user} userData={userData} setNotification={showNotification} />}
+                    {activeTab === 'friends' && <FriendsList user={user} userData={userData} setNotification={showNotification} setChattingWith={setChattingWith} />}
+                    {activeTab === 'find' && <FindFriends user={user} userData={userData} setNotification={showNotification} />}
                 </motion.div>
             </AnimatePresence>
         </div>
@@ -800,7 +804,7 @@ const AffirmationWall = ({ user, userData, setNotification }) => {
             setNewAffirmation('');
         } catch (error) {
             console.error("Error posting affirmation: ", error);
-            setNotification("Failed to post affirmation.");
+            setNotification("Failed to post affirmation.", "error");
         }
     };
     
@@ -811,7 +815,7 @@ const AffirmationWall = ({ user, userData, setNotification }) => {
             setNotification("Affirmation deleted.");
         } catch (error) {
             console.error("Error deleting affirmation:", error);
-            setNotification("Failed to delete affirmation.");
+            setNotification("Failed to delete affirmation.", "error");
         }
     };
 
@@ -842,7 +846,7 @@ const AffirmationWall = ({ user, userData, setNotification }) => {
             });
         } catch (error) {
             console.error("Error reporting affirmation:", error);
-            setNotification(error.message || "Failed to report affirmation.");
+            setNotification(error.message || "Failed to report affirmation.", "error");
         }
     };
 
@@ -884,13 +888,16 @@ const AffirmationWall = ({ user, userData, setNotification }) => {
     );
 };
 
-const FriendsList = ({ user, userData, fetchUserData, setNotification, setChattingWith }) => {
+const FriendsList = ({ user, userData, setNotification, setChattingWith }) => {
     const [friends, setFriends] = useState([]);
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const fetchFriendsAndRequests = useCallback(async () => {
-        if (!userData) return;
+        if (!userData || !userData.friends) {
+            setLoading(false);
+            return;
+        };
         setLoading(true);
         try {
             if (userData.friends && userData.friends.length > 0) {
@@ -909,7 +916,7 @@ const FriendsList = ({ user, userData, fetchUserData, setNotification, setChatti
             }
         } catch (error) {
             console.error("Error fetching friends data:", error);
-            setNotification("Could not load friends list.");
+            setNotification("Could not load friends list.", "error");
         } finally {
             setLoading(false);
         }
@@ -935,7 +942,7 @@ const FriendsList = ({ user, userData, fetchUserData, setNotification, setChatti
             setNotification(accept ? "Friend added!" : "Request declined.");
         } catch (error) {
             console.error("Error handling friend request:", error);
-            setNotification("Failed to process request.");
+            setNotification("Failed to process request.", "error");
         }
     };
 
@@ -1048,7 +1055,7 @@ const FindFriends = ({ user, userData, setNotification }) => {
             setSearchUsername('');
         } catch (error) {
             console.error("Error sending friend request:", error);
-            setNotification("Failed to send request.");
+            setNotification("Failed to send request.", "error");
         }
     };
 
@@ -1216,7 +1223,13 @@ const App = () => {
     const [userData, setUserData] = useState(null);
     const [loadingAuth, setLoadingAuth] = useState(true);
     const [chattingWith, setChattingWith] = useState(null);
+    const [notification, setNotification] = useState({ message: '', type: 'success' });
     const { navigate, back, navigateToRoot, currentView, canGoBack, direction } = useNavigation('dashboard');
+
+    const showNotification = (message, type = 'success') => {
+        setNotification({ message, type });
+        setTimeout(() => setNotification({ message: '', type: 'success' }), 4000);
+    };
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -1229,14 +1242,10 @@ const App = () => {
                         if (doc.exists()) {
                             setUserData(doc.data());
                         }
-                        // If doc doesn't exist, it means user just signed up,
-                        // needsSetup will be true from the Login component's logic.
-                        // The snapshot will update once the doc is created.
                         setLoadingAuth(false);
                     });
                     return () => unsubSnapshot();
                 } else {
-                    // Guest user data
                     setUserData({ 
                         uid: currentUser.uid, 
                         preferredName: 'Guest', 
@@ -1271,30 +1280,25 @@ const App = () => {
     const pageTransition = { type: "tween", ease: "anticipate", duration: 0.4 };
 
     const CurrentView = () => {
-        // Force user to setup account if needed
         if (user && !user.isAnonymous && userData && userData.needsSetup) {
-            return <AccountSetup user={user} db={db} onSetupComplete={() => { /* onSnapshot handles data refresh */ }} />;
+            return <AccountSetup user={user} db={db} onSetupComplete={() => {}} />;
         }
         
-        // Handle chat view separately
         if (chattingWith) {
             return <ChatView user={user} friend={chattingWith} onBack={() => setChattingWith(null)} />;
         }
 
-        // Guest user restrictions
-        if (userData?.isAnonymous) {
-            if (currentView === 'community' || currentView === 'ouija' || currentView === 'past_readings' || currentView === 'profile') {
-                return <Dashboard navigate={navigate} userData={userData}/>;
-            }
+        if (userData?.isAnonymous && (currentView === 'community' || currentView === 'ouija' || currentView === 'past_readings' || currentView === 'profile')) {
+            return <Dashboard navigate={navigate} userData={userData}/>;
         }
 
         switch (currentView) {
             case 'dashboard': return <Dashboard navigate={navigate} userData={userData}/>;
             case 'horoscope': return <Horoscope zodiac={userData?.zodiac} />;
-            case 'tarot': return <TarotReading user={user} fetchUserData={() => {}} />;
-            case 'profile': return <Profile user={user} userData={userData} fetchUserData={() => {}} navigate={navigate} />;
+            case 'tarot': return <TarotReading user={user} showNotification={showNotification} />;
+            case 'profile': return <Profile user={user} userData={userData} showNotification={showNotification} />;
             case 'past_readings': return <PastReadings readings={userData?.readings || []} />;
-            case 'community': return <CommunityHub user={user} userData={userData} fetchUserData={() => {}} setChattingWith={setChattingWith} />;
+            case 'community': return <CommunityHub user={user} userData={userData} setChattingWith={setChattingWith} showNotification={showNotification} />;
             case 'ouija': return <OuijaRoom user={user} userData={userData} onBack={back} />;
             default: return <Dashboard navigate={navigate} userData={userData}/>;
         }
@@ -1305,11 +1309,17 @@ const App = () => {
     }
 
     if (!user) {
-        return <Login />;
+        return (
+            <>
+                <Notification message={notification.message} type={notification.type} />
+                <Login setNotification={showNotification} />
+            </>
+        );
     }
 
     return (
         <div className="bg-background text-foreground font-sans min-h-screen">
+            <Notification message={notification.message} type={notification.type} />
             {!(userData && userData.needsSetup) && !chattingWith && <Header userData={userData} onLogout={handleLogout} onLogoClick={navigateToRoot} onAvatarClick={() => navigate('profile')} onBack={back} canGoBack={canGoBack} />}
             <main className="pb-24 md:pb-4">
                 <AnimatePresence initial={false} mode="wait">
