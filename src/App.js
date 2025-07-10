@@ -90,10 +90,11 @@ const Notification = ({ message, type = 'success' }) => (
     <AnimatePresence>
         {message && (
             <motion.div
-                initial={{ opacity: 0, y: 50 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 20 }}
-                className={`fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full shadow-lg z-50 text-white ${type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}
+                initial={{ opacity: 0, y: 50, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.9 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                className={`fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl shadow-lg z-50 text-white font-semibold ${type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}
             >
                 {message}
             </motion.div>
@@ -256,7 +257,7 @@ const Dashboard = ({ navigate, userData }) => {
     const items = [
         { view: 'horoscope', title: 'Horoscope', desc: 'Daily, weekly, and monthly forecasts.', icon: <Star/> },
         { view: 'tarot', title: 'Tarot Reading', desc: 'Gain insight with a powerful card spread.', icon: <Feather/> },
-        { view: 'past_readings', title: 'Reading Journal', desc: 'Review your saved tarot readings.', icon: <BookOpen/>, guestDisabled: true },
+        { view: 'past_readings', title: 'Reading Journal', desc: 'Review your saved tarot readings.', guestDisabled: true },
         { view: 'community', title: 'Community', desc: 'Connect with friends & share affirmations.', icon: <Users/>, guestDisabled: true },
         { view: 'ouija', title: 'Ouija Room', desc: 'Communicate with the other side.', icon: <Sparkles/>, guestDisabled: true },
     ];
@@ -264,7 +265,7 @@ const Dashboard = ({ navigate, userData }) => {
     return (
         <div className="p-4 sm:p-6">
             <h2 className="text-3xl sm:text-4xl font-serif text-center mb-8 text-foreground">Welcome, {userData?.preferredName || 'Seeker'}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 max-w-4xl mx-auto">
                 {items.map((item, i) => {
                     const isDisabled = item.guestDisabled && userData?.isAnonymous;
                     return (
@@ -274,12 +275,12 @@ const Dashboard = ({ navigate, userData }) => {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: i * 0.1, type: 'spring', stiffness: 100 }}
                             onClick={() => !isDisabled && navigate(item.view)}
-                            className={`bg-card p-6 rounded-2xl shadow-lg border border-border flex items-center space-x-4 ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-foreground/5 transition-all duration-300 transform hover:-translate-y-1 hover:border-primary/50'}`}
+                            className={`bg-card p-4 sm:p-6 rounded-2xl shadow-lg border border-border flex items-center space-x-4 ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-foreground/5 transition-all duration-300 transform hover:-translate-y-1 hover:border-primary/50'}`}
                         >
                             <div className="bg-primary/10 text-primary p-3 rounded-full">{item.icon}</div>
                             <div>
-                                <h3 className="text-xl font-semibold mb-1 text-card-foreground">{item.title}</h3>
-                                <p className="text-card-foreground/70">{item.desc}</p>
+                                <h3 className="text-lg sm:text-xl font-semibold mb-1 text-card-foreground">{item.title}</h3>
+                                <p className="text-sm text-card-foreground/70">{item.desc}</p>
                                 {isDisabled && <p className="text-xs text-amber-500 mt-1">Sign in to access this feature.</p>}
                             </div>
                         </motion.div>
@@ -337,10 +338,10 @@ const Horoscope = ({ zodiac }) => {
     
     return (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 sm:p-6">
-            <div className="bg-card p-6 rounded-2xl shadow-lg border border-border max-w-3xl mx-auto">
+            <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-lg border border-border max-w-3xl mx-auto">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
                     <div>
-                        <h2 className="text-3xl font-serif text-primary capitalize">{timeframe} Horoscope</h2>
+                        <h2 className="text-2xl sm:text-3xl font-serif text-primary capitalize">{timeframe} Horoscope</h2>
                         <h3 className="text-xl font-semibold text-foreground/80">{zodiac}</h3>
                     </div>
                     <div className="flex space-x-2 mt-4 sm:mt-0">
@@ -361,7 +362,7 @@ const Horoscope = ({ zodiac }) => {
                 {error && <ErrorDisplay message={error} />}
 
                 {horoscope && (
-                    <div className="text-lg text-foreground/90 leading-relaxed font-serif space-y-4">
+                    <div className="text-base sm:text-lg text-foreground/90 leading-relaxed font-serif space-y-4">
                         {horoscope.horoscope_data.split('\n').filter(p => p.trim() !== '').map((paragraph, index) => (
                             <p key={index}>
                                 {paragraph}
@@ -463,14 +464,18 @@ const TarotReading = ({ user, showNotification }) => {
     const CardDisplay = ({ card }) => {
         return (
             <div className="flex flex-col items-center">
-                <div className="relative w-full aspect-[2/3.5] bg-gray-700 rounded-xl overflow-hidden">
+                <motion.div 
+                  className="relative w-full aspect-[2/3.5] bg-gray-700 rounded-xl overflow-hidden"
+                  whileHover={{ scale: 1.05, y: -5 }}
+                  transition={{ type: 'spring', stiffness: 300 }}
+                >
                    <img
                         src={`${API_ENDPOINTS.tarotImageBase}${card.img}`}
                         alt={card.name}
                         className={`w-full h-full object-cover ${card.isReversed ? 'rotate-180' : ''}`}
                         onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/200x350/1f2937/9333ea?text=Card+Art'; }}
                     />
-                </div>
+                </motion.div>
                  <button onClick={() => setSelectedCard(card)} className="mt-2 text-sm text-primary hover:underline">View Meaning</button>
             </div>
         );
@@ -482,9 +487,19 @@ const TarotReading = ({ user, showNotification }) => {
                 <h2 className="text-3xl font-serif mb-8 text-foreground">Choose a Tarot Spread</h2>
                 {error && <div className="mb-4"><ErrorDisplay message={error}/></div>}
                 {loading && <div className="flex justify-center"><LoadingSpinner/></div>}
-                <div className="space-y-5">
+                <div className="space-y-4">
                     {[['single', 'Simple Reading (1 Card)', 1], ['three-card', 'Three-Card Spread', 3], ['celtic-cross', 'Celtic Cross', 10]].map(([type, label, count], i) => (
-                        <motion.button key={type} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.15 }} onClick={() => drawCards(count, type)} disabled={loading || fullDeck.length === 0} className="w-full bg-card border border-border p-4 rounded-xl hover:border-primary text-card-foreground font-semibold transition-all hover:bg-foreground/5 disabled:opacity-50">
+                        <motion.button 
+                            key={type} 
+                            initial={{ opacity: 0, x: -20 }} 
+                            animate={{ opacity: 1, x: 0 }} 
+                            transition={{ delay: i * 0.1 }}
+                            whileHover={{ scale: 1.03 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => drawCards(count, type)} 
+                            disabled={loading || fullDeck.length === 0} 
+                            className="w-full bg-card border border-border p-4 rounded-xl hover:border-primary text-card-foreground font-semibold transition-all hover:bg-foreground/5 disabled:opacity-50"
+                        >
                             {label}
                         </motion.button>
                     ))}
@@ -529,35 +544,26 @@ const TarotReading = ({ user, showNotification }) => {
 
             {cards && cards.length > 0 && (
                 <div className="max-w-5xl mx-auto">
-                    {spreadType === 'single' && <div className="w-48 mx-auto"><CardDisplay card={cards[0]}/></div>}
+                    {spreadType === 'single' && <div className="w-40 sm:w-48 mx-auto"><CardDisplay card={cards[0]}/></div>}
                     {spreadType === 'three-card' && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-8">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-8">
                             {cards.map((card, i) => (
                                 <div key={card.id}>
-                                    <h3 className="text-center text-xl font-serif text-foreground mb-3">{['Past', 'Present', 'Future'][i]}</h3>
-                                    <div className="w-48 mx-auto"><CardDisplay card={card}/></div>
+                                    <h3 className="text-center text-lg sm:text-xl font-serif text-foreground mb-3">{['Past', 'Present', 'Future'][i]}</h3>
+                                    <div className="w-40 sm:w-48 mx-auto"><CardDisplay card={card}/></div>
                                 </div>
                             ))}
                         </div>
                     )}
                      {spreadType === 'celtic-cross' && cards.length === 10 && (
-                         <div className="w-full max-w-lg mx-auto p-2 flex space-x-2">
-                             <div className="flex-1 grid grid-cols-3 grid-rows-4 gap-2">
-                                <div className="col-start-2 row-start-1"><CardDisplay card={cards[4]}/></div>
-                                <div className="col-start-1 row-start-2"><CardDisplay card={cards[3]}/></div>
-                                <div className="col-start-2 row-start-2"><CardDisplay card={cards[0]}/></div>
-                                <div className="col-start-3 row-start-2"><CardDisplay card={cards[5]}/></div>
-                                <div className="col-start-2 row-start-3"><CardDisplay card={cards[2]}/></div>
-                                <div className="col-start-2 row-start-4"><CardDisplay card={cards[1]}/></div>
-                             </div>
-                             <div className="flex-shrink-0 w-1/4 border-l-2 border-primary/50 pl-2">
-                                <div className="space-y-2">
-                                    <CardDisplay card={cards[9]}/>
-                                    <CardDisplay card={cards[8]}/>
-                                    <CardDisplay card={cards[7]}/>
-                                    <CardDisplay card={cards[6]}/>
+                         <div className="grid grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4">
+                            {/* This is a simplified layout for mobile scalability */}
+                            {cards.map((card, i) => (
+                                <div key={card.id} className="flex flex-col items-center">
+                                    <p className="text-xs text-center text-foreground/70 mb-1">{i+1}</p>
+                                    <div className="w-full"><CardDisplay card={card}/></div>
                                 </div>
-                             </div>
+                            ))}
                          </div>
                     )}
                 </div>
@@ -676,7 +682,7 @@ const Profile = ({ user, userData, showNotification }) => {
 
 
     return (
-        <div className="bg-card p-6 rounded-2xl shadow-lg max-w-lg mx-auto border border-border">
+        <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-lg max-w-lg mx-auto border border-border">
             <AnimatePresence>
                 {showInfo && (
                     <Modal onClose={() => setShowInfo(false)}>
@@ -707,10 +713,10 @@ const Profile = ({ user, userData, showNotification }) => {
             <h2 className="text-3xl font-serif mb-6 text-foreground text-center">Profile & Settings</h2>
 
             <div className="flex flex-col items-center mb-6">
-                <img src={API_ENDPOINTS.avatar(avatarSeed)} alt="avatar" className="w-32 h-32 rounded-full border-4 border-primary/40 mb-4" />
+                <img src={API_ENDPOINTS.avatar(avatarSeed)} alt="avatar" className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-primary/40 mb-4" />
                 <div className="w-full space-y-4">
                     <div>
-                        <label className="text-foreground/80 mb-2 block">Username</label>
+                        <label className="text-foreground/80 mb-2 block text-sm">Username</label>
                         <div className="flex items-center space-x-2">
                              <input type="text" value={`@${userData?.username || ''}`} className="bg-input/50 text-foreground/70 p-3 rounded-lg w-full border border-border" disabled/>
                              {!user.isAnonymous && <button onClick={() => setShowUsernameChange(true)} className="p-3 bg-primary/20 text-primary rounded-lg hover:bg-primary/30"><Edit size={18}/></button>}
@@ -728,19 +734,19 @@ const Profile = ({ user, userData, showNotification }) => {
                         )}
                     </div>
                      <div>
-                        <label htmlFor="preferredName" className="text-foreground/80 mb-2 block">Preferred Name</label>
+                        <label htmlFor="preferredName" className="text-foreground/80 mb-2 block text-sm">Preferred Name</label>
                         <input id="preferredName" type="text" value={preferredName} onChange={(e) => setPreferredName(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors" disabled={user.isAnonymous}/>
                     </div>
                      <div>
-                        <label htmlFor="pronouns" className="text-foreground/80 mb-2 block">Pronouns</label>
+                        <label htmlFor="pronouns" className="text-foreground/80 mb-2 block text-sm">Pronouns</label>
                         <input id="pronouns" type="text" value={pronouns} onChange={(e) => setPronouns(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors" disabled={user.isAnonymous}/>
                     </div>
                     <div>
-                         <label htmlFor="avatarSeed" className="text-foreground/80 mb-2 flex items-center">Avatar Seed <Info size={14} className="ml-2 cursor-pointer" onClick={() => setShowInfo(true)}/></label>
+                         <label htmlFor="avatarSeed" className="text-foreground/80 mb-2 flex items-center text-sm">Avatar Seed <Info size={14} className="ml-2 cursor-pointer" onClick={() => setShowInfo(true)}/></label>
                         <input id="avatarSeed" type="text" value={avatarSeed} onChange={(e) => setAvatarSeed(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors" placeholder="Enter anything here" disabled={user.isAnonymous}/>
                     </div>
                     <div>
-                         <label htmlFor="zodiac" className="text-foreground/80 mb-2 block">Zodiac Sign</label>
+                         <label htmlFor="zodiac" className="text-foreground/80 mb-2 block text-sm">Zodiac Sign</label>
                         <select id="zodiac" value={zodiac} onChange={(e) => setZodiac(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors appearance-none" disabled={user.isAnonymous}>
                             {zodiacSigns.map(sign => <option key={sign} value={sign}>{sign}</option>)}
                         </select>
@@ -968,7 +974,7 @@ const AffirmationWall = ({ user, userData, setNotification }) => {
     };
 
     return (
-        <div className="bg-card p-6 rounded-2xl shadow-lg border border-border">
+        <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-lg border border-border">
             <h3 className="text-2xl font-serif text-primary mb-4">Affirmation Wall</h3>
             {!user.isAnonymous && (
                 <form onSubmit={handlePostAffirmation} className="flex space-x-2 mb-6">
@@ -1049,7 +1055,7 @@ const FriendsList = ({ user, userData, setNotification, setChattingWith }) => {
     );
 
     return (
-        <div className="bg-card p-6 rounded-2xl shadow-lg border border-border">
+        <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-lg border border-border">
             <h3 className="text-xl font-serif text-primary mb-3">Your Friends</h3>
             {loading && <p>Loading...</p>}
             {!loading && (
@@ -1127,7 +1133,7 @@ const Notifications = ({ user, userData, setNotification }) => {
     };
     
     return (
-        <div className="bg-card p-6 rounded-2xl shadow-lg border border-border">
+        <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-lg border border-border">
             <h3 className="text-2xl font-serif text-primary mb-4">Notifications</h3>
             {loading && <p>Loading...</p>}
             {!loading && (
@@ -1225,7 +1231,7 @@ const FindFriends = ({ user, userData, setNotification }) => {
     const isRequestReceived = searchResult && userData.friendRequestsReceived?.includes(searchResult.uid);
 
     return (
-        <div className="bg-card p-6 rounded-2xl shadow-lg border border-border">
+        <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-lg border border-border">
             <h3 className="text-2xl font-serif text-primary mb-4">Find Friends</h3>
             <form onSubmit={handleSearch} className="flex space-x-2 mb-4">
                 <input 
@@ -1487,7 +1493,14 @@ const App = () => {
             {!(userData && userData.needsSetup) && !chattingWith && <Header userData={userData} onLogout={handleLogout} onLogoClick={navigateToRoot} onAvatarClick={() => navigate('profile')} onBack={back} canGoBack={canGoBack} />}
             <main className="pb-24 md:pb-4">
                 <AnimatePresence initial={false} mode="wait">
-                    <motion.div key={currentView + (userData?.needsSetup ? 'setup' : '') + (chattingWith ? chattingWith.uid : '')} initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+                    <motion.div 
+                        key={currentView + (userData?.needsSetup ? 'setup' : '') + (chattingWith ? chattingWith.uid : '')}
+                        initial="initial"
+                        animate="in"
+                        exit="out"
+                        variants={pageVariants}
+                        transition={pageTransition}
+                    >
                         <CurrentView />
                     </motion.div>
                 </AnimatePresence>
