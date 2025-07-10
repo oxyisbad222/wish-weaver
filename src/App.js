@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, signInAnonymously } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -113,7 +113,7 @@ const Modal = ({ children, onClose }) => (
 // --- Page/View Components ---
 
 const Login = () => {
-    const handleLogin = async () => {
+    const handleGoogleLogin = async () => {
         try {
             const result = await signInWithPopup(auth, provider);
             const user = result.user;
@@ -132,6 +132,14 @@ const Login = () => {
             }
         } catch (error) {
             console.error("Authentication Error:", error);
+        }
+    };
+
+    const handleGuestLogin = async () => {
+        try {
+            await signInAnonymously(auth);
+        } catch (error) {
+            console.error("Anonymous Authentication Error:", error);
         }
     };
 
@@ -155,25 +163,34 @@ const Login = () => {
             >
                 Your cosmic guide awaits.
             </motion.p>
-            <motion.button
+            <motion.div
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.8, type: 'spring' }}
-                onClick={handleLogin}
-                className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-4 px-8 rounded-full shadow-lg shadow-purple-500/30 transition-all duration-300 ease-in-out transform hover:scale-105 flex items-center space-x-3"
+                className="flex flex-col space-y-4 w-full max-w-xs"
             >
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56,12.25C22.56,11.47 22.49,10.72 22.36,10H12.27V14.1H18.1C17.84,15.55 17.03,16.8 15.84,17.64V20.25H19.45C21.45,18.44 22.56,15.63 22.56,12.25Z" /><path d="M12.27,23C15.05,23 17.4,22.04 19.03,20.59L15.42,17.98C14.49,18.63 13.46,19 12.27,19C9.86,19 7.8,17.43 7,15.21H3.29V17.9C4.93,20.99 8.3,23 12.27,23Z" /><path d="M7,15.21C6.75,14.46 6.6,13.65 6.6,12.8C6.6,11.95 6.75,11.14 7,10.39V7.69H3.29C2.48,9.22 2,10.95 2,12.8C2,14.65 2.48,16.38 3.29,17.9L7,15.21Z" /><path d="M12.27,6.6C13.55,6.6 14.63,7.03 15.53,7.86L18.51,4.88C16.88,3.38 14.78,2.5 12.27,2.5C8.3,2.5 4.93,4.51 3.29,7.69L7,10.39C7.8,8.17 9.86,6.6 12.27,6.6Z" /></svg>
-                <span>Sign in with Google</span>
-            </motion.button>
+                <button
+                    onClick={handleGoogleLogin}
+                    className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-4 px-8 rounded-full shadow-lg shadow-purple-500/30 transition-all duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center space-x-3"
+                >
+                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56,12.25C22.56,11.47 22.49,10.72 22.36,10H12.27V14.1H18.1C17.84,15.55 17.03,16.8 15.84,17.64V20.25H19.45C21.45,18.44 22.56,15.63 22.56,12.25Z" /><path d="M12.27,23C15.05,23 17.4,22.04 19.03,20.59L15.42,17.98C14.49,18.63 13.46,19 12.27,19C9.86,19 7.8,17.43 7,15.21H3.29V17.9C4.93,20.99 8.3,23 12.27,23Z" /><path d="M7,15.21C6.75,14.46 6.6,13.65 6.6,12.8C6.6,11.95 6.75,11.14 7,10.39V7.69H3.29C2.48,9.22 2,10.95 2,12.8C2,14.65 2.48,16.38 3.29,17.9L7,15.21Z" /><path d="M12.27,6.6C13.55,6.6 14.63,7.03 15.53,7.86L18.51,4.88C16.88,3.38 14.78,2.5 12.27,2.5C8.3,2.5 4.93,4.51 3.29,7.69L7,10.39C7.8,8.17 9.86,6.6 12.27,6.6Z" /></svg>
+                    <span>Sign in with Google</span>
+                </button>
+                <button
+                    onClick={handleGuestLogin}
+                    className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-4 px-8 rounded-full shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105"
+                >
+                    Continue as Guest
+                </button>
+            </motion.div>
         </div>
     );
 };
-
 const Header = ({ userData, onLogout }) => (
     <header className="bg-gray-900/50 backdrop-blur-sm p-4 flex justify-between items-center sticky top-0 z-30 border-b border-white/10">
         <h1 className="text-2xl font-bold font-serif text-purple-300">Wish Weaver</h1>
         <div className="flex items-center space-x-4">
-            <img src={API_ENDPOINTS.avatar(userData?.avatarSeed || userData?.displayName)} alt="avatar" className="w-12 h-12 rounded-full border-2 border-purple-400 bg-purple-200" />
+            <img src={API_ENDPOINTS.avatar(userData?.avatarSeed || userData?.displayName || 'guest')} alt="avatar" className="w-12 h-12 rounded-full border-2 border-purple-400 bg-purple-200" />
             <button onClick={onLogout} className="bg-purple-600/50 hover:bg-purple-600 border border-purple-500 text-white font-bold py-2 px-4 rounded-full text-sm transition-colors">
                 Logout
             </button>
@@ -313,7 +330,7 @@ const TarotReading = ({ user, fetchUserData }) => {
             setTimeout(() => setNotification(''), 3000);
         }
     };
-    
+
     const handleCardClick = (card, index) => {
         if (!revealed.has(index)) {
             setRevealed(prev => new Set(prev).add(index));
