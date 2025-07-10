@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, signInAnonymously } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sun, Moon, LogOut, User, Star, Menu, X, Key, Feather, BookOpen, Search } from 'lucide-react';
-
+import { Sun, Moon, LogOut, User, Star, Menu, X, Key, Feather, BookOpen, Search, ArrowLeft } from 'lucide-react';
 
 // --- Firebase & API Configuration ---
 const firebaseConfig = {
@@ -22,15 +21,46 @@ const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
 const API_ENDPOINTS = {
-    horoscope: (sign) => `https://horoscope-app-api.vercel.app/api/v1/get-horoscope/daily?sign=${sign.toLowerCase()}&day=TODAY`,
-    tarot: (count) => `https://tarot-api-3hv5.onrender.com/api/v1/cards/random?n=${count}`,
+    horoscope: (sign, day) => `https://horoscope-app-api.vercel.app/api/v1/get-horoscope/daily?sign=${sign.toLowerCase()}&day=${day}`,
+    horoscopeWeekly: (sign) => `https://horoscope-app-api.vercel.app/api/v1/get-horoscope/weekly?sign=${sign.toLowerCase()}`,
+    horoscopeMonthly: (sign) => `https://horoscope-app-api.vercel.app/api/v1/get-horoscope/monthly?sign=${sign.toLowerCase()}`,
+    tarot: (count) => `https://tarot-api.onrender.com/api/v1/cards/random?n=${count}`,
     tarotImage: (imgId) => `https://www.sacred-texts.com/tarot/pkt/img/${imgId}`,
     avatar: (seed) => `https://api.dicebear.com/8.x/notionists/svg?seed=${seed}&backgroundColor=f0e7f7,e0f0e9,d1d4f9`
 };
 
-// --- Tarot Logic ---
+
+// --- Navigation Hook ---
+const useNavigation = (initialView = 'dashboard') => {
+    const [history, setHistory] = useState([initialView]);
+    const direction = useRef(1); // 1 for forward, -1 for back
+
+    const navigate = (newView) => {
+        direction.current = 1;
+        setHistory(prev => [...prev, newView]);
+    };
+
+    const back = () => {
+        direction.current = -1;
+        if (history.length > 1) {
+            setHistory(prev => prev.slice(0, -1));
+        }
+    };
+    
+    const navigateToRoot = () => {
+        direction.current = -1;
+        setHistory(['dashboard']);
+    };
+
+    const currentView = history[history.length - 1];
+    const canGoBack = history.length > 1;
+
+    return { navigate, back, navigateToRoot, currentView, canGoBack, direction: direction.current };
+};
+
+
+// --- Tarot Logic (Unchanged) ---
 const getInsightfulMeaning = (card, position, isReversed) => {
-    // (Logic unchanged from previous version)
     const baseMeaning = isReversed ? card.meaning_rev : card.meaning_up;
     const positionMeanings = {
         1: "The Heart of the Matter: This card represents the core of your situation, the central issue you are facing.",
@@ -57,8 +87,8 @@ const getInsightfulMeaning = (card, position, isReversed) => {
     };
 };
 
-// --- UI Components ---
 
+// --- UI Components ---
 const LoadingSpinner = () => (
     <div className="flex justify-center items-center h-screen w-full bg-background">
         <motion.div
@@ -149,7 +179,6 @@ const Login = () => {
         }
     };
 
-
     return (
         <div className="min-h-screen flex flex-col items-center justify-center text-foreground p-4 text-center bg-background">
             <motion.h1
@@ -186,11 +215,26 @@ const Login = () => {
         </div>
     );
 };
-const Header = ({ userData, onLogout }) => (
+
+const Header = ({ userData, onLogout, onLogoClick, onAvatarClick, onBack, canGoBack }) => (
     <header className="bg-card/80 backdrop-blur-sm p-4 flex justify-between items-center sticky top-0 z-40 border-b border-border">
-        <h1 className="text-xl font-bold font-serif text-primary">Wish Weaver</h1>
         <div className="flex items-center space-x-4">
-            <img src={API_ENDPOINTS.avatar(userData?.avatarSeed || userData?.displayName || 'guest')} alt="avatar" className="w-10 h-10 rounded-full border-2 border-primary/50" />
+            {canGoBack && (
+                <button onClick={onBack} className="p-2 rounded-full hover:bg-foreground/10 transition-colors">
+                    <ArrowLeft className="text-foreground/70" size={20}/>
+                </button>
+            )}
+            <h1 onClick={onLogoClick} className="text-xl font-bold font-serif text-primary cursor-pointer">
+                Wish Weaver
+            </h1>
+        </div>
+        <div className="flex items-center space-x-4">
+            <img 
+                src={API_ENDPOINTS.avatar(userData?.avatarSeed || userData?.displayName || 'guest')} 
+                alt="avatar" 
+                onClick={onAvatarClick}
+                className="w-10 h-10 rounded-full border-2 border-primary/50 cursor-pointer hover:border-primary transition-colors" 
+            />
              <button onClick={onLogout} className="p-2 rounded-full hover:bg-foreground/10 transition-colors">
                 <LogOut className="text-foreground/70" size={20}/>
             </button>
@@ -198,13 +242,11 @@ const Header = ({ userData, onLogout }) => (
     </header>
 );
 
-const Dashboard = ({ setView, userData }) => {
-    // (Component unchanged)
+const Dashboard = ({ navigate, userData }) => {
     const items = [
-        { view: 'horoscope', title: 'Daily Horoscope', desc: 'Get your personalized astrological forecast.', icon: <Star/> },
+        { view: 'horoscope', title: 'Horoscope', desc: 'Daily, weekly, and monthly forecasts.', icon: <Star/> },
         { view: 'tarot', title: 'Tarot Reading', desc: 'Gain insight with a powerful card spread.', icon: <Feather/> },
         { view: 'past_readings', title: 'Reading Journal', desc: 'Review your saved tarot readings.', icon: <BookOpen/> },
-        { view: 'profile', title: 'Customize Profile', desc: 'Personalize your avatar and zodiac sign.', icon: <User/> }
     ];
 
     return (
@@ -217,7 +259,7 @@ const Dashboard = ({ setView, userData }) => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.1, type: 'spring', stiffness: 100 }}
-                        onClick={() => setView(item.view)}
+                        onClick={() => navigate(item.view)}
                         className="bg-card p-6 rounded-2xl shadow-lg cursor-pointer hover:bg-foreground/5 transition-all duration-300 border border-border hover:border-primary/50 transform hover:-translate-y-1 flex items-center space-x-4"
                     >
                         <div className="bg-primary/10 text-primary p-3 rounded-full">{item.icon}</div>
@@ -232,49 +274,94 @@ const Dashboard = ({ setView, userData }) => {
     );
 };
 
+// --- HOROSCOPE: REFACTORED FOR MULTIPLE TIMEFRAMES ---
 const Horoscope = ({ zodiac }) => {
-    // (Component unchanged)
     const [horoscope, setHoroscope] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [timeframe, setTimeframe] = useState('daily'); // 'daily', 'weekly', 'monthly'
+
+    const fetchHoroscope = useCallback(async () => {
+        if (!zodiac) return;
+        setLoading(true);
+        setHoroscope(null);
+        let url;
+        switch(timeframe) {
+            case 'monthly':
+                url = API_ENDPOINTS.horoscopeMonthly(zodiac);
+                break;
+            case 'weekly':
+                url = API_ENDPOINTS.horoscopeWeekly(zodiac);
+                break;
+            case 'daily':
+            default:
+                 url = API_ENDPOINTS.horoscope(zodiac, 'TODAY');
+                break;
+        }
+
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+            if (data.success) {
+                setHoroscope(data.data);
+            } else {
+                throw new Error("API request was not successful");
+            }
+        } catch (error) {
+            console.error(`Error fetching ${timeframe} horoscope:`, error);
+            setHoroscope({ horoscope_data: `Could not retrieve ${timeframe} horoscope. Please try again later.` });
+        } finally {
+            setLoading(false);
+        }
+    }, [zodiac, timeframe]);
 
     useEffect(() => {
-        if (!zodiac) return;
-        const fetchHoroscope = async () => {
-            setLoading(true);
-            try {
-                const response = await fetch(API_ENDPOINTS.horoscope(zodiac));
-                const data = await response.json();
-                setHoroscope(data.data);
-            } catch (error) {
-                console.error("Error fetching horoscope:", error);
-                setHoroscope({ horoscope_data: "Could not retrieve horoscope. Please try again later." });
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchHoroscope();
-    }, [zodiac]);
+    }, [fetchHoroscope]);
 
+    const TimeframeButton = ({ value, label }) => (
+        <button
+            onClick={() => setTimeframe(value)}
+            className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${timeframe === value ? 'bg-primary text-primary-foreground' : 'bg-foreground/10 hover:bg-foreground/20'}`}
+        >
+            {label}
+        </button>
+    );
+    
     return (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 sm:p-6">
             <div className="bg-card p-6 rounded-2xl shadow-lg border border-border max-w-3xl mx-auto">
-                <h2 className="text-3xl font-serif mb-2 text-primary">{zodiac}</h2>
-                <h3 className="text-xl font-semibold mb-6 text-foreground/80">Your Daily Reading</h3>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+                    <div>
+                        <h2 className="text-3xl font-serif text-primary capitalize">{timeframe} Horoscope</h2>
+                        <h3 className="text-xl font-semibold text-foreground/80">{zodiac}</h3>
+                    </div>
+                    <div className="flex space-x-2 mt-4 sm:mt-0">
+                       <TimeframeButton value="daily" label="Daily" />
+                       <TimeframeButton value="weekly" label="Weekly" />
+                       <TimeframeButton value="monthly" label="Monthly" />
+                    </div>
+                </div>
+                
                 {loading ? (
                     <div className="space-y-4">
                         <div className="h-4 bg-foreground/10 rounded w-full animate-pulse"></div>
                         <div className="h-4 bg-foreground/10 rounded w-5/6 animate-pulse"></div>
                         <div className="h-4 bg-foreground/10 rounded w-full animate-pulse"></div>
+                        <div className="h-4 bg-foreground/10 rounded w-4/6 animate-pulse"></div>
                     </div>
                 ) : (
-                    <p className="text-lg text-foreground/90 leading-relaxed font-serif">{horoscope?.horoscope_data}</p>
+                    <p className="text-lg text-foreground/90 leading-relaxed font-serif whitespace-pre-line">
+                        {horoscope?.horoscope_data}
+                    </p>
                 )}
             </div>
         </motion.div>
     );
 };
 
-const TarotReading = ({ user, fetchUserData }) => {
+
+// --- TarotReading Component (Unchanged) ---
+const TarotReading = ({ user, fetchUserData, navigate }) => {
     // (Logic and minor style changes)
     const [spreadType, setSpreadType] = useState(null);
     const [cards, setCards] = useState([]);
@@ -303,6 +390,11 @@ const TarotReading = ({ user, fetchUserData }) => {
     
     const handleSaveReading = async () => {
         // (Logic unchanged)
+        if (user.isAnonymous) {
+             setNotification('Guests cannot save readings.');
+             setTimeout(() => setNotification(''), 3000);
+             return;
+        }
         if (revealed.size !== cards.length) {
             setNotification('Reveal all cards to save.');
             setTimeout(() => setNotification(''), 3000);
@@ -401,7 +493,6 @@ const TarotReading = ({ user, fetchUserData }) => {
         );
     }
     
-    // (JSX for TarotReading view with new styles)
     return (
         <div className="p-4">
             <Notification message={notification} />
@@ -418,7 +509,7 @@ const TarotReading = ({ user, fetchUserData }) => {
 
             <div className="flex justify-center mb-6 space-x-4">
                  <Button onClick={() => setSpreadType(null)} variant="secondary">New Spread</Button>
-                 <Button onClick={handleSaveReading} variant="primary">Save Reading</Button>
+                 <Button onClick={handleSaveReading} variant="primary" disabled={user.isAnonymous}>Save Reading</Button>
             </div>
             {loading ? <LoadingSpinner /> : (
                 <div className="max-w-5xl mx-auto">
@@ -435,7 +526,6 @@ const TarotReading = ({ user, fetchUserData }) => {
                     )}
                      {spreadType === 'celtic-cross' && cards.length === 10 && (
                         <div className="w-full max-w-xl mx-auto aspect-[3/4] grid grid-cols-4 grid-rows-6 gap-2">
-                            {/* Card positions remain the same, just rendering the styled card */}
                              <div className="col-start-1 row-start-3"><Card card={cards[3]} index={3} /></div>
                              <div className="col-start-2 row-start-4"><Card card={cards[2]} index={2} /></div>
                              <div className="col-start-2 row-start-2"><Card card={cards[4]} index={4} /></div>
@@ -456,10 +546,9 @@ const TarotReading = ({ user, fetchUserData }) => {
     );
 };
 
-// --- Other Components ---
-// (Other components like Profile, PastReadings, Footer, and App are updated below)
-// --- Profile Component with New Styling ---
-const Profile = ({ user, userData, fetchUserData, setView }) => {
+
+// --- Profile and PastReadings Components (Unchanged) ---
+const Profile = ({ user, userData, fetchUserData, navigate }) => {
     const [avatarSeed, setAvatarSeed] = useState(userData?.avatarSeed || user.displayName);
     const [zodiac, setZodiac] = useState(userData?.zodiac || 'Aries');
     const [notification, setNotification] = useState('');
@@ -467,6 +556,11 @@ const Profile = ({ user, userData, fetchUserData, setView }) => {
     const zodiacSigns = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
 
     const handleSave = async () => {
+        if (user.isAnonymous) {
+            setNotification("Guests can't save profiles.");
+            setTimeout(() => setNotification(''), 3000);
+            return;
+        }
         setNotification('Saving...');
         const userDocRef = doc(db, "users", user.uid);
         try {
@@ -496,23 +590,31 @@ const Profile = ({ user, userData, fetchUserData, setView }) => {
                     onChange={(e) => setAvatarSeed(e.target.value)}
                     className="bg-input text-foreground p-3 rounded-lg w-full text-center border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
                     placeholder="Enter a name or phrase"
+                    disabled={user.isAnonymous}
                 />
             </div>
 
             <div className="mb-8">
                 <label htmlFor="zodiac" className="text-foreground/80 mb-2 block text-center">Zodiac Sign</label>
-                <select id="zodiac" value={zodiac} onChange={(e) => setZodiac(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors appearance-none text-center">
+                <select 
+                    id="zodiac" 
+                    value={zodiac} 
+                    onChange={(e) => setZodiac(e.target.value)} 
+                    className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors appearance-none text-center"
+                    disabled={user.isAnonymous}
+                >
                     {zodiacSigns.map(sign => <option key={sign} value={sign}>{sign}</option>)}
                 </select>
             </div>
             
-            <Button onClick={handleSave} className="w-full">Save Changes</Button>
-            <Button onClick={() => setView('past_readings')} variant="ghost" className="w-full mt-2">View Reading Journal</Button>
+            <Button onClick={handleSave} className="w-full" disabled={user.isAnonymous}>Save Changes</Button>
+            {!user.isAnonymous &&
+                <Button onClick={() => navigate('past_readings')} variant="ghost" className="w-full mt-2">View Reading Journal</Button>
+            }
         </div>
     );
 };
 
-// --- PastReadings Component with New Styling ---
 const PastReadings = ({ readings }) => {
     const [expanded, setExpanded] = useState(null);
     return (
@@ -569,8 +671,8 @@ const PastReadings = ({ readings }) => {
     );
 };
 
-// --- Footer Component with New Styling ---
-const Footer = ({ setView, activeView }) => {
+// --- Footer Component ---
+const Footer = ({ navigate, activeView }) => {
     const navItems = [
         { name: 'Home', view: 'dashboard', icon: <Menu /> },
         { name: 'Horoscope', view: 'horoscope', icon: <Star /> },
@@ -584,7 +686,7 @@ const Footer = ({ setView, activeView }) => {
                 {navItems.map(item => (
                     <button
                         key={item.name}
-                        onClick={() => setView(item.view)}
+                        onClick={() => navigate(item.view)}
                         className={`flex flex-col items-center justify-center w-full py-2 px-1 rounded-lg transition-all duration-300 relative text-sm ${activeView === item.view ? 'text-primary' : 'text-foreground/60 hover:text-primary'}`}
                     >
                         {React.cloneElement(item.icon, { size: 20 })}
@@ -603,12 +705,13 @@ const Footer = ({ setView, activeView }) => {
     );
 };
 
+
 // --- Main App Component ---
 const App = () => {
     const [user, setUser] = useState(null);
     const [userData, setUserData] = useState(null);
     const [loadingAuth, setLoadingAuth] = useState(true);
-    const [view, setView] = useState('dashboard');
+    const { navigate, back, navigateToRoot, currentView, canGoBack, direction } = useNavigation('dashboard');
 
     const fetchUserData = useCallback(async (uid) => {
         if (!uid) return;
@@ -626,11 +729,10 @@ const App = () => {
                 if (!currentUser.isAnonymous) {
                     await fetchUserData(currentUser.uid);
                 } else {
-                    // Create a default structure for anonymous users
                     setUserData({
                         uid: currentUser.uid,
                         displayName: 'Guest',
-                        avatarSeed: 'guest-seed',
+                        avatarSeed: 'guest-user-seed',
                         zodiac: 'Aries',
                         readings: []
                     })
@@ -646,17 +748,38 @@ const App = () => {
 
     const handleLogout = async () => {
         await signOut(auth);
-        setView('dashboard');
+        navigateToRoot();
+    };
+
+    const pageVariants = {
+        initial: {
+            opacity: 0,
+            x: `${10 * direction}%`
+        },
+        in: {
+            opacity: 1,
+            x: "0%"
+        },
+        out: {
+            opacity: 0,
+            x: `${-10 * direction}%`
+        }
+    };
+
+    const pageTransition = {
+        type: "tween",
+        ease: "anticipate",
+        duration: 0.4
     };
 
     const CurrentView = () => {
-        switch (view) {
-            case 'dashboard': return <Dashboard setView={setView} userData={userData}/>;
+        switch (currentView) {
+            case 'dashboard': return <Dashboard navigate={navigate} userData={userData}/>;
             case 'horoscope': return <Horoscope zodiac={userData?.zodiac} />;
-            case 'tarot': return <TarotReading user={user} fetchUserData={fetchUserData} />;
-            case 'profile': return <Profile user={user} userData={userData} fetchUserData={fetchUserData} setView={setView} />;
+            case 'tarot': return <TarotReading user={user} fetchUserData={fetchUserData} navigate={navigate} />;
+            case 'profile': return <Profile user={user} userData={userData} fetchUserData={fetchUserData} navigate={navigate} />;
             case 'past_readings': return <PastReadings readings={userData?.readings || []} />;
-            default: return <Dashboard setView={setView} userData={userData}/>;
+            default: return <Dashboard navigate={navigate} userData={userData}/>;
         }
     };
 
@@ -670,21 +793,29 @@ const App = () => {
 
     return (
         <div className="bg-background text-foreground font-sans min-h-screen">
-            <Header userData={userData} onLogout={handleLogout} />
+            <Header 
+                userData={userData} 
+                onLogout={handleLogout}
+                onLogoClick={navigateToRoot}
+                onAvatarClick={() => navigate('profile')}
+                onBack={back}
+                canGoBack={canGoBack}
+            />
             <main className="pb-24 md:pb-4">
-                <AnimatePresence mode="wait">
+                <AnimatePresence initial={false} mode="wait">
                     <motion.div
-                        key={view}
-                        initial={{ opacity: 0, y: 15 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -15 }}
-                        transition={{ duration: 0.25 }}
+                        key={currentView}
+                        initial="initial"
+                        animate="in"
+                        exit="out"
+                        variants={pageVariants}
+                        transition={pageTransition}
                     >
                         <CurrentView />
-                    </motion.div>
+                    </motion.motion.div>
                 </AnimatePresence>
             </main>
-            <Footer setView={setView} activeView={view} />
+            <Footer navigate={navigate} activeView={currentView} />
         </div>
     );
 };
