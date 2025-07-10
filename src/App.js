@@ -5,7 +5,7 @@ import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove, 
 import { motion, AnimatePresence } from 'framer-motion';
 import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle, Info, Users, MessageSquare, Sparkles, UserPlus, Send, Check, X, Trash2, Flag } from 'lucide-react';
 import AccountSetup from './AccountSetup';
-import OuijaRoom from './OuijaRoom'; // Import OuijaRoom
+import OuijaRoom from './OuijaRoom';
 
 const firebaseConfig = {
     apiKey: process.env.REACT_APP_APIKEY,
@@ -141,22 +141,26 @@ const Button = ({ onClick, children, variant = 'primary', className = '', disabl
 };
 
 const Login = () => {
-    const handleGoogleLogin = async () => {
+    const handleGoogleLogin = async (isSignUp) => {
         try {
             const result = await signInWithPopup(auth, provider);
             const user = result.user;
             const userDocRef = doc(db, "users", user.uid);
             const userDoc = await getDoc(userDocRef);
+
+            // If it's a new user (document doesn't exist), create it with needsSetup: true
             if (!userDoc.exists()) {
                 await setDoc(userDocRef, {
                     uid: user.uid,
                     email: user.email,
                     photoURL: user.photoURL,
                     googleDisplayName: user.displayName,
-                    needsSetup: true,
+                    needsSetup: true, // This triggers the AccountSetup component
                     createdAt: new Date().toISOString(),
                 });
             }
+            // If it's an existing user signing in, we just let the onAuthStateChanged handle it.
+            // The needsSetup flag will be read from their existing document.
         } catch (error) {
             console.error("Authentication Error:", error);
         }
@@ -195,11 +199,15 @@ const Login = () => {
                 transition={{ delay: 0.8, type: 'spring' }}
                 className="flex flex-col space-y-4 w-full max-w-xs"
             >
-                <Button onClick={handleGoogleLogin} variant="primary">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56,12.25C22.56,11.47 22.49,10.72 22.36,10H12.27V14.1H18.1C17.84,15.55 17.03,16.8 15.84,17.64V20.25H19.45C21.45,18.44 22.56,15.63 22.56,12.25Z" /><path d="M12.27,23C15.05,23 17.4,22.04 19.03,20.59L15.42,17.98C14.49,18.63 13.46,19 12.27,19C9.86,19 7.8,17.43 7,15.21H3.29V17.9C4.93,20.99 8.3,23 12.27,23Z" /><path d="M7,15.21C6.75,14.46 6.6,13.65 6.6,12.8C6.6,11.95 6.75,11.14 7,10.39V7.69H3.29C2.48,9.22 2,10.95 2,12.8C2,14.65 2.48,16.38 3.29,17.9L7,15.21Z" /><path d="M12.27,6.6C13.55,6.6 14.63,7.03 15.53,7.86L18.51,4.88C16.88,3.38 14.78,2.5 12.27,2.5C8.3,2.5 4.93,4.51 3.29,7.69L7,10.39C7.8,8.17 9.86,6.6 12.27,6.6Z" /></svg>
-                    <span>Sign in with Google</span>
+                <Button onClick={() => handleGoogleLogin(true)} variant="primary">
+                    <UserPlus size={18}/>
+                    <span>Sign Up with Google</span>
                 </Button>
-                <Button onClick={handleGuestLogin} variant="secondary">
+                 <Button onClick={() => handleGoogleLogin(false)} variant="secondary">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56,12.25C22.56,11.47 22.49,10.72 22.36,10H12.27V14.1H18.1C17.84,15.55 17.03,16.8 15.84,17.64V20.25H19.45C21.45,18.44 22.56,15.63 22.56,12.25Z" /><path d="M12.27,23C15.05,23 17.4,22.04 19.03,20.59L15.42,17.98C14.49,18.63 13.46,19 12.27,19C9.86,19 7.8,17.43 7,15.21H3.29V17.9C4.93,20.99 8.3,23 12.27,23Z" /><path d="M7,15.21C6.75,14.46 6.6,13.65 6.6,12.8C6.6,11.95 6.75,11.14 7,10.39V7.69H3.29C2.48,9.22 2,10.95 2,12.8C2,14.65 2.48,16.38 3.29,17.9L7,15.21Z" /><path d="M12.27,6.6C13.55,6.6 14.63,7.03 15.53,7.86L18.51,4.88C16.88,3.38 14.78,2.5 12.27,2.5C8.3,2.5 4.93,4.51 3.29,7.69L7,10.39C7.8,8.17 9.86,6.6 12.27,6.6Z" /></svg>
+                    <span>Sign In with Google</span>
+                </Button>
+                <Button onClick={handleGuestLogin} variant="ghost" className="text-foreground/60">
                     <Key size={18}/>
                     <span>Continue as Guest</span>
                 </Button>
@@ -239,117 +247,37 @@ const Dashboard = ({ navigate, userData }) => {
     const items = [
         { view: 'horoscope', title: 'Horoscope', desc: 'Daily, weekly, and monthly forecasts.', icon: <Star/> },
         { view: 'tarot', title: 'Tarot Reading', desc: 'Gain insight with a powerful card spread.', icon: <Feather/> },
-        { view: 'past_readings', title: 'Reading Journal', desc: 'Review your saved tarot readings.', icon: <BookOpen/> },
-        { view: 'community', title: 'Community', desc: 'Connect with friends & share affirmations.', icon: <Users/> },
-        { view: 'ouija', title: 'Ouija Room', desc: 'Communicate with the other side.', icon: <Sparkles/> },
+        { view: 'past_readings', title: 'Reading Journal', desc: 'Review your saved tarot readings.', icon: <BookOpen/>, guestDisabled: true },
+        { view: 'community', title: 'Community', desc: 'Connect with friends & share affirmations.', icon: <Users/>, guestDisabled: true },
+        { view: 'ouija', title: 'Ouija Room', desc: 'Communicate with the other side.', icon: <Sparkles/>, guestDisabled: true },
     ];
 
     return (
         <div className="p-4 sm:p-6">
             <h2 className="text-3xl sm:text-4xl font-serif text-center mb-8 text-foreground">Welcome, {userData?.preferredName || 'Seeker'}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-                {items.map((item, i) => (
-                    <motion.div
-                        key={item.view}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.1, type: 'spring', stiffness: 100 }}
-                        onClick={() => navigate(item.view)}
-                        className="bg-card p-6 rounded-2xl shadow-lg cursor-pointer hover:bg-foreground/5 transition-all duration-300 border border-border hover:border-primary/50 transform hover:-translate-y-1 flex items-center space-x-4"
-                    >
-                        <div className="bg-primary/10 text-primary p-3 rounded-full">{item.icon}</div>
-                        <div>
-                            <h3 className="text-xl font-semibold mb-1 text-card-foreground">{item.title}</h3>
-                            <p className="text-card-foreground/70">{item.desc}</p>
-                        </div>
-                    </motion.div>
-                ))}
+                {items.map((item, i) => {
+                    const isDisabled = item.guestDisabled && userData?.isAnonymous;
+                    return (
+                        <motion.div
+                            key={item.view}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: i * 0.1, type: 'spring', stiffness: 100 }}
+                            onClick={() => !isDisabled && navigate(item.view)}
+                            className={`bg-card p-6 rounded-2xl shadow-lg border border-border flex items-center space-x-4 ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-foreground/5 transition-all duration-300 transform hover:-translate-y-1 hover:border-primary/50'}`}
+                        >
+                            <div className="bg-primary/10 text-primary p-3 rounded-full">{item.icon}</div>
+                            <div>
+                                <h3 className="text-xl font-semibold mb-1 text-card-foreground">{item.title}</h3>
+                                <p className="text-card-foreground/70">{item.desc}</p>
+                                {isDisabled && <p className="text-xs text-amber-500 mt-1">Sign in to access this feature.</p>}
+                            </div>
+                        </motion.div>
+                    );
+                })}
             </div>
         </div>
-    );
-};
-
-const Horoscope = ({ zodiac }) => {
-    const [horoscope, setHoroscope] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [timeframe, setTimeframe] = useState('daily');
-
-    const fetchHoroscope = useCallback(async () => {
-        if (!zodiac) return;
-        setLoading(true);
-        setError(null);
-        setHoroscope(null);
-        
-        const url = API_ENDPOINTS.horoscope(zodiac, timeframe);
-
-        try {
-            const response = await fetch(url);
-            const data = await response.json();
-            
-            if (!response.ok || !data.success) {
-                throw new Error(data.error || "Failed to retrieve horoscope.");
-            }
-            
-            setHoroscope(data.data);
-
-        } catch (err) {
-            console.error(`Error fetching ${timeframe} horoscope:`, err);
-            setError(err.message || `Could not retrieve ${timeframe} horoscope. Please try again later.`);
-        } finally {
-            setLoading(false);
-        }
-    }, [zodiac, timeframe]);
-
-    useEffect(() => {
-        fetchHoroscope();
-    }, [fetchHoroscope]);
-
-    const TimeframeButton = ({ value, label }) => (
-        <button
-            onClick={() => setTimeframe(value)}
-            className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${timeframe === value ? 'bg-primary text-primary-foreground' : 'bg-foreground/10 hover:bg-foreground/20'}`}
-        >
-            {label}
-        </button>
-    );
-    
-    return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 sm:p-6">
-            <div className="bg-card p-6 rounded-2xl shadow-lg border border-border max-w-3xl mx-auto">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-                    <div>
-                        <h2 className="text-3xl font-serif text-primary capitalize">{timeframe} Horoscope</h2>
-                        <h3 className="text-xl font-semibold text-foreground/80">{zodiac}</h3>
-                    </div>
-                    <div className="flex space-x-2 mt-4 sm:mt-0">
-                       <TimeframeButton value="daily" label="Daily" />
-                       <TimeframeButton value="weekly" label="Weekly" />
-                       <TimeframeButton value="monthly" label="Monthly" />
-                    </div>
-                </div>
-                
-                {loading && (
-                    <div className="space-y-4">
-                        <div className="h-4 bg-foreground/10 rounded w-full animate-pulse"></div>
-                        <div className="h-4 bg-foreground/10 rounded w-5/6 animate-pulse"></div>
-                        <div className="h-4 bg-foreground/10 rounded w-full animate-pulse"></div>
-                    </div>
-                )}
-
-                {error && <ErrorDisplay message={error} />}
-
-                {horoscope && (
-                    <div className="text-lg text-foreground/90 leading-relaxed font-serif space-y-4">
-                        {horoscope.horoscope_data.split('\n').filter(p => p.trim() !== '').map((paragraph, index) => (
-                            <p key={index}>
-                                {paragraph}
-                            </p>
-                        ))}
-                    </div>
-                )}
-            </div>
-        </motion.div>
     );
 };
 
@@ -485,15 +413,13 @@ const TarotReading = ({ user, fetchUserData }) => {
             <AnimatePresence>
                 {selectedCard && interpretation && (
                     <Modal onClose={() => setSelectedCard(null)}>
-                        <h2 className="text-3xl font-serif text-primary mb-2">{interpretation.title}</h2>
-                        <div className="text-lg text-foreground/90 leading-relaxed font-serif space-y-3">
-                            {interpretation.meaning.map((p, i) => <p key={i}>{p}</p>)}
-                        </div>
-                        <p className="text-md text-foreground/60 mt-4 font-sans">{interpretation.description}</p>
-                        <div className="mt-6 text-center">
-                            <Button onClick={() => setSelectedCard(null)} variant="secondary">
-                                <ArrowLeft className="mr-2 h-4 w-4"/> Back
-                            </Button>
+                        <div className="relative">
+                            <button onClick={() => setSelectedCard(null)} className="absolute -top-2 -right-2 p-2 rounded-full hover:bg-foreground/10 z-10"><X size={20}/></button>
+                            <h2 className="text-3xl font-serif text-primary mb-2">{interpretation.title}</h2>
+                            <div className="text-lg text-foreground/90 leading-relaxed font-serif space-y-3">
+                                {interpretation.meaning.map((p, i) => <p key={i}>{p}</p>)}
+                            </div>
+                            <p className="text-md text-foreground/60 mt-4 font-sans">{interpretation.description}</p>
                         </div>
                     </Modal>
                 )}
@@ -647,7 +573,7 @@ const Profile = ({ user, userData, fetchUserData, navigate }) => {
                 <div className="w-full space-y-4">
                     <div>
                         <label className="text-foreground/80 mb-2 block">Username</label>
-                        <input type="text" value={`@${userData?.username || ''}`} className="bg-input/50 text-foreground/70 p-3 rounded-lg w-full border border-border" disabled/>
+                        <input type="text" value={userData?.isAnonymous ? 'N/A' : `@${userData?.username || ''}`} className="bg-input/50 text-foreground/70 p-3 rounded-lg w-full border border-border" disabled/>
                     </div>
                      <div>
                         <label htmlFor="preferredName" className="text-foreground/80 mb-2 block">Preferred Name</label>
@@ -714,13 +640,6 @@ const PastReadings = ({ readings }) => {
         </div>
     );
 };
-
-const PlaceholderView = ({ title }) => (
-    <div className="flex flex-col items-center justify-center h-[60vh] text-center p-4">
-        <h2 className="text-4xl font-serif text-primary mb-4">{title}</h2>
-        <p className="text-foreground/70 max-w-md">This feature is coming soon! We're working hard to bring this to life. Stay tuned for updates.</p>
-    </div>
-);
 
 const CommunityHub = ({ user, userData, fetchUserData, setChattingWith }) => {
     const [activeTab, setActiveTab] = useState('affirmations');
@@ -1175,26 +1094,34 @@ const ChatView = ({ user, friend, onBack }) => {
     );
 };
 
-const Footer = ({ navigate, activeView }) => {
+const Footer = ({ navigate, activeView, userData }) => {
     const navItems = [
         { name: 'Home', view: 'dashboard', icon: <Menu /> },
-        { name: 'Community', view: 'community', icon: <Users /> },
+        { name: 'Community', view: 'community', icon: <Users />, guestDisabled: true },
         { name: 'Tarot', view: 'tarot', icon: <Feather /> },
-        { name: 'Profile', view: 'profile', icon: <User /> }
+        { name: 'Profile', view: 'profile', icon: <User />, guestDisabled: true }
     ];
 
     return (
         <footer className="fixed bottom-0 left-0 right-0 bg-card/80 backdrop-blur-sm border-t border-border z-30 md:hidden">
             <nav className="flex justify-around p-1">
-                {navItems.map(item => (
-                    <button key={item.name} onClick={() => navigate(item.view)} className={`flex flex-col items-center justify-center w-full py-2 px-1 rounded-lg transition-all duration-300 relative text-sm ${activeView === item.view ? 'text-primary' : 'text-foreground/60 hover:text-primary'}`}>
-                        {React.cloneElement(item.icon, { size: 20 })}
-                        <span className="text-xs mt-1">{item.name}</span>
-                        {activeView === item.view && (
-                            <motion.div layoutId="active-pill" className="absolute bottom-0 h-1 w-8 bg-primary rounded-full" transition={{ type: 'spring', stiffness: 300, damping: 25 }}></motion.div>
-                        )}
-                    </button>
-                ))}
+                {navItems.map(item => {
+                    const isDisabled = item.guestDisabled && userData?.isAnonymous;
+                    return (
+                        <button 
+                            key={item.name} 
+                            onClick={() => !isDisabled && navigate(item.view)} 
+                            disabled={isDisabled}
+                            className={`flex flex-col items-center justify-center w-full py-2 px-1 rounded-lg transition-all duration-300 relative text-sm ${activeView === item.view ? 'text-primary' : 'text-foreground/60'} ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:text-primary'}`}
+                        >
+                            {React.cloneElement(item.icon, { size: 20 })}
+                            <span className="text-xs mt-1">{item.name}</span>
+                            {activeView === item.view && !isDisabled && (
+                                <motion.div layoutId="active-pill" className="absolute bottom-0 h-1 w-8 bg-primary rounded-full" transition={{ type: 'spring', stiffness: 300, damping: 25 }}></motion.div>
+                            )}
+                        </button>
+                    );
+                })}
             </nav>
         </footer>
     );
@@ -1218,11 +1145,22 @@ const App = () => {
                         if (doc.exists()) {
                             setUserData(doc.data());
                         }
+                        // If doc doesn't exist, it means user just signed up,
+                        // needsSetup will be true from the Login component's logic.
+                        // The snapshot will update once the doc is created.
                         setLoadingAuth(false);
                     });
                     return () => unsubSnapshot();
                 } else {
-                    setUserData({ uid: currentUser.uid, displayName: 'Guest', avatarSeed: 'guest-user-seed', zodiac: 'Aries', readings: [], isAnonymous: true });
+                    // Guest user data
+                    setUserData({ 
+                        uid: currentUser.uid, 
+                        preferredName: 'Guest', 
+                        avatarSeed: 'guest-user-seed', 
+                        zodiac: 'Aries', 
+                        readings: [], 
+                        isAnonymous: true 
+                    });
                     setLoadingAuth(false);
                 }
             } else {
@@ -1249,12 +1187,21 @@ const App = () => {
     const pageTransition = { type: "tween", ease: "anticipate", duration: 0.4 };
 
     const CurrentView = () => {
+        // Force user to setup account if needed
         if (user && !user.isAnonymous && userData && userData.needsSetup) {
-            return <AccountSetup user={user} db={db} onSetupComplete={() => { /* fetchUserData is now handled by onSnapshot */ }} />;
+            return <AccountSetup user={user} db={db} onSetupComplete={() => { /* onSnapshot handles data refresh */ }} />;
         }
         
+        // Handle chat view separately
         if (chattingWith) {
             return <ChatView user={user} friend={chattingWith} onBack={() => setChattingWith(null)} />;
+        }
+
+        // Guest user restrictions
+        if (userData?.isAnonymous) {
+            if (currentView === 'community' || currentView === 'ouija' || currentView === 'past_readings' || currentView === 'profile') {
+                return <Dashboard navigate={navigate} userData={userData}/>;
+            }
         }
 
         switch (currentView) {
@@ -1287,7 +1234,7 @@ const App = () => {
                     </motion.div>
                 </AnimatePresence>
             </main>
-            {!(userData && userData.needsSetup) && !chattingWith && <Footer navigate={navigate} activeView={currentView} />}
+            {!(userData && userData.needsSetup) && !chattingWith && <Footer navigate={navigate} activeView={currentView} userData={userData} />}
         </div>
     );
 };
