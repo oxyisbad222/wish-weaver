@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, signInAnonymously } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove, collection, query, where, getDocs, writeBatch, serverTimestamp, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle, Info, Users, MessageSquare, Sparkles } from 'lucide-react';
+import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle, Info, Users, MessageSquare, Sparkles, UserPlus, Send, Check, X } from 'lucide-react';
 import AccountSetup from './AccountSetup';
 
 const firebaseConfig = {
@@ -665,11 +665,336 @@ const PastReadings = ({ readings }) => {
 };
 
 const PlaceholderView = ({ title }) => (
-    <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+    <div className="flex flex-col items-center justify-center h-[60vh] text-center p-4">
         <h2 className="text-4xl font-serif text-primary mb-4">{title}</h2>
         <p className="text-foreground/70 max-w-md">This feature is coming soon! We're working hard to bring this to life. Stay tuned for updates.</p>
     </div>
 );
+
+const CommunityHub = ({ user, userData, fetchUserData }) => {
+    const [activeTab, setActiveTab] = useState('affirmations');
+    const [notification, setNotification] = useState('');
+
+    const TabButton = ({ tabName, label }) => (
+        <button
+            onClick={() => setActiveTab(tabName)}
+            className={`px-4 py-2 text-sm font-semibold rounded-full transition-colors ${activeTab === tabName ? 'bg-primary text-primary-foreground' : 'bg-foreground/10 hover:bg-foreground/20'}`}
+        >
+            {label}
+        </button>
+    );
+
+    return (
+        <div className="p-4 sm:p-6 max-w-4xl mx-auto">
+            <Notification message={notification} />
+            <h2 className="text-3xl font-serif mb-6 text-center text-foreground">Community Hub</h2>
+            <div className="flex justify-center space-x-2 mb-6">
+                <TabButton tabName="affirmations" label="Affirmations" />
+                <TabButton tabName="friends" label="Friends" />
+                <TabButton tabName="find" label="Find Friends" />
+            </div>
+            <AnimatePresence mode="wait">
+                <motion.div
+                    key={activeTab}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                >
+                    {activeTab === 'affirmations' && <AffirmationWall user={user} userData={userData} />}
+                    {activeTab === 'friends' && <FriendsList user={user} userData={userData} fetchUserData={fetchUserData} setNotification={setNotification} />}
+                    {activeTab === 'find' && <FindFriends user={user} userData={userData} setNotification={setNotification} />}
+                </motion.div>
+            </AnimatePresence>
+        </div>
+    );
+};
+
+const AffirmationWall = ({ user, userData }) => {
+    const [affirmations, setAffirmations] = useState([]);
+    const [newAffirmation, setNewAffirmation] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const q = query(collection(db, "affirmations"), orderBy("timestamp", "desc"), limit(50));
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const affirmationsData = [];
+            querySnapshot.forEach((doc) => {
+                affirmationsData.push({ id: doc.id, ...doc.data() });
+            });
+            setAffirmations(affirmationsData);
+            setIsLoading(false);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const handlePostAffirmation = async (e) => {
+        e.preventDefault();
+        if (newAffirmation.trim() === '' || user.isAnonymous) return;
+        
+        const affirmationData = {
+            text: newAffirmation,
+            authorId: user.uid,
+            authorUsername: userData.username,
+            authorAvatarSeed: userData.avatarSeed,
+            timestamp: serverTimestamp()
+        };
+
+        try {
+            await setDoc(doc(collection(db, "affirmations")), affirmationData);
+            setNewAffirmation('');
+        } catch (error) {
+            console.error("Error posting affirmation: ", error);
+        }
+    };
+
+    return (
+        <div className="bg-card p-6 rounded-2xl shadow-lg border border-border">
+            <h3 className="text-2xl font-serif text-primary mb-4">Affirmation Wall</h3>
+            {!user.isAnonymous && (
+                <form onSubmit={handlePostAffirmation} className="flex space-x-2 mb-6">
+                    <input 
+                        type="text"
+                        value={newAffirmation}
+                        onChange={(e) => setNewAffirmation(e.target.value)}
+                        placeholder="Share a positive thought..."
+                        className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
+                    />
+                    <Button type="submit" variant="primary" className="px-4" disabled={!newAffirmation.trim()}><Send size={18}/></Button>
+                </form>
+            )}
+            <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
+                {isLoading && <p>Loading affirmations...</p>}
+                {affirmations.map(aff => (
+                    <div key={aff.id} className="bg-background p-4 rounded-lg flex items-start space-x-4">
+                        <img src={API_ENDPOINTS.avatar(aff.authorAvatarSeed)} alt="avatar" className="w-10 h-10 rounded-full border-2 border-primary/30" />
+                        <div>
+                            <p className="font-semibold text-foreground">@{aff.authorUsername}</p>
+                            <p className="text-foreground/90">{aff.text}</p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const FriendsList = ({ user, userData, fetchUserData, setNotification }) => {
+    const [friends, setFriends] = useState([]);
+    const [requests, setRequests] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchFriendsAndRequests = useCallback(async () => {
+        setLoading(true);
+        try {
+            // Fetch friends
+            if (userData.friends && userData.friends.length > 0) {
+                const friendsQuery = query(collection(db, 'users'), where('uid', 'in', userData.friends));
+                const friendsSnapshot = await getDocs(friendsQuery);
+                setFriends(friendsSnapshot.docs.map(doc => doc.data()));
+            } else {
+                setFriends([]);
+            }
+            // Fetch friend requests
+            if (userData.friendRequestsReceived && userData.friendRequestsReceived.length > 0) {
+                const requestsQuery = query(collection(db, 'users'), where('uid', 'in', userData.friendRequestsReceived));
+                const requestsSnapshot = await getDocs(requestsQuery);
+                setRequests(requestsSnapshot.docs.map(doc => doc.data()));
+            } else {
+                setRequests([]);
+            }
+        } catch (error) {
+            console.error("Error fetching friends data:", error);
+            setNotification("Could not load friends list.");
+        } finally {
+            setLoading(false);
+        }
+    }, [userData, setNotification]);
+
+    useEffect(() => {
+        if (userData) {
+            fetchFriendsAndRequests();
+        }
+    }, [userData, fetchFriendsAndRequests]);
+
+    const handleRequest = async (targetUid, accept) => {
+        const batch = writeBatch(db);
+        const currentUserRef = doc(db, "users", user.uid);
+        const targetUserRef = doc(db, "users", targetUid);
+
+        batch.update(currentUserRef, { friendRequestsReceived: arrayRemove(targetUid) });
+        batch.update(targetUserRef, { friendRequestsSent: arrayRemove(user.uid) });
+
+        if (accept) {
+            batch.update(currentUserRef, { friends: arrayUnion(targetUid) });
+            batch.update(targetUserRef, { friends: arrayUnion(user.uid) });
+        }
+        
+        try {
+            await batch.commit();
+            setNotification(accept ? "Friend added!" : "Request declined.");
+            await fetchUserData(user.uid); // Refresh user data
+        } catch (error) {
+            console.error("Error handling friend request:", error);
+            setNotification("Failed to process request.");
+        }
+    };
+
+    const UserCard = ({ profile, children }) => (
+        <div className="bg-background p-3 rounded-lg flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+                <img src={API_ENDPOINTS.avatar(profile.avatarSeed)} alt="avatar" className="w-10 h-10 rounded-full" />
+                <div>
+                    <p className="font-semibold text-foreground">{profile.preferredName}</p>
+                    <p className="text-sm text-foreground/60">@{profile.username}</p>
+                </div>
+            </div>
+            <div>{children}</div>
+        </div>
+    );
+
+    return (
+        <div className="bg-card p-6 rounded-2xl shadow-lg border border-border">
+            {loading && <p>Loading...</p>}
+            {!loading && (
+                <>
+                    {requests.length > 0 && (
+                        <div className="mb-6">
+                            <h3 className="text-xl font-serif text-primary mb-3">Friend Requests</h3>
+                            <div className="space-y-2">
+                                {requests.map(req => (
+                                    <UserCard key={req.uid} profile={req}>
+                                        <div className="flex space-x-2">
+                                            <button onClick={() => handleRequest(req.uid, true)} className="p-2 bg-green-500/20 text-green-400 rounded-full hover:bg-green-500/40"><Check size={16}/></button>
+                                            <button onClick={() => handleRequest(req.uid, false)} className="p-2 bg-red-500/20 text-red-400 rounded-full hover:bg-red-500/40"><X size={16}/></button>
+                                        </div>
+                                    </UserCard>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    <div>
+                        <h3 className="text-xl font-serif text-primary mb-3">Your Friends</h3>
+                        {friends.length > 0 ? (
+                            <div className="space-y-2">
+                                {friends.map(friend => <UserCard key={friend.uid} profile={friend} />)}
+                            </div>
+                        ) : (
+                            <p className="text-foreground/60 text-center py-4">You haven't added any friends yet.</p>
+                        )}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+};
+
+const FindFriends = ({ user, userData, setNotification }) => {
+    const [searchUsername, setSearchUsername] = useState('');
+    const [searchResult, setSearchResult] = useState(null);
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchMessage, setSearchMessage] = useState('');
+
+    const handleSearch = async (e) => {
+        e.preventDefault();
+        if (searchUsername.trim() === '' || searchUsername.trim() === userData.username) {
+            setSearchResult(null);
+            return;
+        }
+        setIsSearching(true);
+        setSearchResult(null);
+        setSearchMessage('');
+
+        try {
+            const usernamesRef = collection(db, 'usernames');
+            const q = query(usernamesRef, where("username", "==", searchUsername.toLowerCase()));
+            const querySnapshot = await getDocs(q);
+
+            if (querySnapshot.empty) {
+                setSearchMessage('User not found.');
+            } else {
+                const foundUsernameDoc = querySnapshot.docs[0].data();
+                const userDocRef = doc(db, 'users', foundUsernameDoc.uid);
+                const userDoc = await getDoc(userDocRef);
+                if (userDoc.exists()) {
+                    setSearchResult(userDoc.data());
+                } else {
+                    setSearchMessage('User not found.');
+                }
+            }
+        } catch (error) {
+            console.error("Error searching for user:", error);
+            setSearchMessage('An error occurred during search.');
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    const handleSendRequest = async (targetUid) => {
+        const batch = writeBatch(db);
+        const currentUserRef = doc(db, "users", user.uid);
+        const targetUserRef = doc(db, "users", targetUid);
+
+        batch.update(currentUserRef, { friendRequestsSent: arrayUnion(targetUid) });
+        batch.update(targetUserRef, { friendRequestsReceived: arrayUnion(user.uid) });
+
+        try {
+            await batch.commit();
+            setNotification(`Friend request sent to @${searchUsername}!`);
+            setSearchResult(null);
+            setSearchUsername('');
+        } catch (error) {
+            console.error("Error sending friend request:", error);
+            setNotification("Failed to send request.");
+        }
+    };
+
+    const isAlreadyFriend = searchResult && userData.friends?.includes(searchResult.uid);
+    const isRequestSent = searchResult && userData.friendRequestsSent?.includes(searchResult.uid);
+    const isRequestReceived = searchResult && userData.friendRequestsReceived?.includes(searchResult.uid);
+
+    return (
+        <div className="bg-card p-6 rounded-2xl shadow-lg border border-border">
+            <h3 className="text-2xl font-serif text-primary mb-4">Find Friends</h3>
+            <form onSubmit={handleSearch} className="flex space-x-2 mb-4">
+                <input 
+                    type="text"
+                    value={searchUsername}
+                    onChange={(e) => setSearchUsername(e.target.value)}
+                    placeholder="Search by username..."
+                    className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
+                />
+                <Button type="submit" variant="primary" className="px-4" disabled={isSearching}>Search</Button>
+            </form>
+
+            {isSearching && <p>Searching...</p>}
+            {searchMessage && <p className="text-center text-foreground/60 py-4">{searchMessage}</p>}
+            
+            {searchResult && (
+                <div className="bg-background p-3 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                        <img src={API_ENDPOINTS.avatar(searchResult.avatarSeed)} alt="avatar" className="w-10 h-10 rounded-full" />
+                        <div>
+                            <p className="font-semibold text-foreground">{searchResult.preferredName}</p>
+                            <p className="text-sm text-foreground/60">@{searchResult.username}</p>
+                        </div>
+                    </div>
+                    <div>
+                        {isAlreadyFriend ? (
+                            <span className="text-sm text-green-400 font-semibold">Friend</span>
+                        ) : isRequestSent ? (
+                            <span className="text-sm text-foreground/60">Request Sent</span>
+                        ) : isRequestReceived ? (
+                             <span className="text-sm text-primary">Check Requests</span>
+                        ) : (
+                            <button onClick={() => handleSendRequest(searchResult.uid)} className="p-2 bg-primary/20 text-primary rounded-full hover:bg-primary/40"><UserPlus size={16}/></button>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 
 const Footer = ({ navigate, activeView }) => {
@@ -705,15 +1030,19 @@ const App = () => {
 
     const fetchUserData = useCallback(async (uid) => {
         if (!uid) return;
+        setLoadingAuth(true);
         try {
             const userDocRef = doc(db, "users", uid);
-            const userDoc = await getDoc(userDocRef);
-            if (userDoc.exists()) {
-                setUserData(userDoc.data());
-            }
+            const unsub = onSnapshot(userDocRef, (doc) => {
+                if (doc.exists()) {
+                    setUserData(doc.data());
+                }
+                setLoadingAuth(false);
+            });
+            // Returning the unsubscribe function to be called on cleanup, though React's flow here makes it tricky
+            // This is more for direct useEffect usage.
         } catch (error) {
             console.error("Error fetching user data:", error);
-        } finally {
             setLoadingAuth(false);
         }
     }, []);
@@ -724,7 +1053,14 @@ const App = () => {
             if (currentUser) {
                 setUser(currentUser);
                 if (!currentUser.isAnonymous) {
-                    await fetchUserData(currentUser.uid);
+                    // Using onSnapshot for real-time updates
+                    const userDocRef = doc(db, "users", currentUser.uid);
+                    return onSnapshot(userDocRef, (doc) => {
+                        if (doc.exists()) {
+                            setUserData(doc.data());
+                        }
+                        setLoadingAuth(false);
+                    });
                 } else {
                     setUserData({ uid: currentUser.uid, displayName: 'Guest', avatarSeed: 'guest-user-seed', zodiac: 'Aries', readings: [], isAnonymous: true });
                     setLoadingAuth(false);
@@ -735,8 +1071,11 @@ const App = () => {
                 setLoadingAuth(false);
             }
         });
-        return () => unsubscribe();
-    }, [fetchUserData]);
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
+    }, []);
+
 
     const handleLogout = async () => {
         await signOut(auth);
@@ -752,7 +1091,7 @@ const App = () => {
     const pageTransition = { type: "tween", ease: "anticipate", duration: 0.4 };
 
     const CurrentView = () => {
-        if (userData && userData.needsSetup) {
+        if (user && !user.isAnonymous && userData && userData.needsSetup) {
             return <AccountSetup user={user} db={db} onSetupComplete={() => fetchUserData(user.uid)} />;
         }
         switch (currentView) {
@@ -761,7 +1100,7 @@ const App = () => {
             case 'tarot': return <TarotReading user={user} fetchUserData={fetchUserData} />;
             case 'profile': return <Profile user={user} userData={userData} fetchUserData={fetchUserData} navigate={navigate} />;
             case 'past_readings': return <PastReadings readings={userData?.readings || []} />;
-            case 'community': return <PlaceholderView title="Community Hub" />;
+            case 'community': return <CommunityHub user={user} userData={userData} fetchUserData={fetchUserData} />;
             case 'ouija': return <PlaceholderView title="Ouija Room" />;
             default: return <Dashboard navigate={navigate} userData={userData}/>;
         }
@@ -777,7 +1116,7 @@ const App = () => {
 
     return (
         <div className="bg-background text-foreground font-sans min-h-screen">
-            {!userData?.needsSetup && <Header userData={userData} onLogout={handleLogout} onLogoClick={navigateToRoot} onAvatarClick={() => navigate('profile')} onBack={back} canGoBack={canGoBack} />}
+            {!(userData && userData.needsSetup) && <Header userData={userData} onLogout={handleLogout} onLogoClick={navigateToRoot} onAvatarClick={() => navigate('profile')} onBack={back} canGoBack={canGoBack} />}
             <main className="pb-24 md:pb-4">
                 <AnimatePresence initial={false} mode="wait">
                     <motion.div key={currentView + (userData?.needsSetup ? 'setup' : '')} initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
@@ -785,7 +1124,7 @@ const App = () => {
                     </motion.div>
                 </AnimatePresence>
             </main>
-            {!userData?.needsSetup && <Footer navigate={navigate} activeView={currentView} />}
+            {!(userData && userData.needsSetup) && <Footer navigate={navigate} activeView={currentView} />}
         </div>
     );
 };
