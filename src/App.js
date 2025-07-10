@@ -3,7 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, signInAnonymously, deleteUser } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove, collection, query, where, getDocs, writeBatch, serverTimestamp, onSnapshot, orderBy, limit, addDoc, deleteDoc, runTransaction } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle, Info, Users, MessageSquare, Sparkles, UserPlus, Send, Check, X, Trash2, Flag } from 'lucide-react';
+import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle, Info, Users, MessageSquare, Sparkles, UserPlus, Send, Check, X, Trash2, Flag, Bell } from 'lucide-react';
 import AccountSetup from './AccountSetup';
 import OuijaRoom from './OuijaRoom';
 
@@ -734,12 +734,13 @@ const PastReadings = ({ readings }) => {
 const CommunityHub = ({ user, userData, setChattingWith, showNotification }) => {
     const [activeTab, setActiveTab] = useState('affirmations');
 
-    const TabButton = ({ tabName, label }) => (
+    const TabButton = ({ tabName, label, count }) => (
         <button
             onClick={() => setActiveTab(tabName)}
-            className={`px-4 py-2 text-sm font-semibold rounded-full transition-colors ${activeTab === tabName ? 'bg-primary text-primary-foreground' : 'bg-foreground/10 hover:bg-foreground/20'}`}
+            className={`px-4 py-2 text-sm font-semibold rounded-full transition-colors relative ${activeTab === tabName ? 'bg-primary text-primary-foreground' : 'bg-foreground/10 hover:bg-foreground/20'}`}
         >
             {label}
+            {count > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">{count}</span>}
         </button>
     );
 
@@ -749,6 +750,7 @@ const CommunityHub = ({ user, userData, setChattingWith, showNotification }) => 
             <div className="flex justify-center space-x-2 mb-6">
                 <TabButton tabName="affirmations" label="Affirmations" />
                 <TabButton tabName="friends" label="Friends" />
+                <TabButton tabName="notifications" label="Notifications" count={userData?.friendRequestsReceived?.length || 0} />
                 <TabButton tabName="find" label="Find Friends" />
             </div>
             <AnimatePresence mode="wait">
@@ -761,6 +763,7 @@ const CommunityHub = ({ user, userData, setChattingWith, showNotification }) => 
                 >
                     {activeTab === 'affirmations' && <AffirmationWall user={user} userData={userData} setNotification={showNotification} />}
                     {activeTab === 'friends' && <FriendsList user={user} userData={userData} setNotification={showNotification} setChattingWith={setChattingWith} />}
+                    {activeTab === 'notifications' && <Notifications user={user} userData={userData} setNotification={showNotification} />}
                     {activeTab === 'find' && <FindFriends user={user} userData={userData} setNotification={showNotification} />}
                 </motion.div>
             </AnimatePresence>
@@ -890,7 +893,6 @@ const AffirmationWall = ({ user, userData, setNotification }) => {
 
 const FriendsList = ({ user, userData, setNotification, setChattingWith }) => {
     const [friends, setFriends] = useState([]);
-    const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const fetchFriendsAndRequests = useCallback(async () => {
@@ -907,13 +909,6 @@ const FriendsList = ({ user, userData, setNotification, setChattingWith }) => {
             } else {
                 setFriends([]);
             }
-            if (userData.friendRequestsReceived && userData.friendRequestsReceived.length > 0) {
-                const requestsQuery = query(collection(db, 'users'), where('uid', 'in', userData.friendRequestsReceived));
-                const requestsSnapshot = await getDocs(requestsQuery);
-                setRequests(requestsSnapshot.docs.map(doc => doc.data()));
-            } else {
-                setRequests([]);
-            }
         } catch (error) {
             console.error("Error fetching friends data:", error);
             setNotification("Could not load friends list.", "error");
@@ -925,6 +920,72 @@ const FriendsList = ({ user, userData, setNotification, setChattingWith }) => {
     useEffect(() => {
         fetchFriendsAndRequests();
     }, [userData, fetchFriendsAndRequests]);
+
+    const UserCard = ({ profile, children }) => (
+        <div className="bg-background p-3 rounded-lg flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+                <img src={API_ENDPOINTS.avatar(profile.avatarSeed)} alt="avatar" className="w-10 h-10 rounded-full" />
+                <div>
+                    <p className="font-semibold text-foreground">{profile.preferredName}</p>
+                    <p className="text-sm text-foreground/60">@{profile.username}</p>
+                </div>
+            </div>
+            <div>{children}</div>
+        </div>
+    );
+
+    return (
+        <div className="bg-card p-6 rounded-2xl shadow-lg border border-border">
+            <h3 className="text-xl font-serif text-primary mb-3">Your Friends</h3>
+            {loading && <p>Loading...</p>}
+            {!loading && (
+                <>
+                    {friends.length > 0 ? (
+                        <div className="space-y-2">
+                            {friends.map(friend => (
+                                <UserCard key={friend.uid} profile={friend}>
+                                    <button onClick={() => setChattingWith(friend)} className="p-2 bg-primary/20 text-primary rounded-full hover:bg-primary/40"><MessageSquare size={16}/></button>
+                                </UserCard>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-foreground/60 text-center py-4">You haven't added any friends yet.</p>
+                    )}
+                </>
+            )}
+        </div>
+    );
+};
+
+const Notifications = ({ user, userData, setNotification }) => {
+    const [requests, setRequests] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchRequests = useCallback(async () => {
+        if (!userData || !userData.friendRequestsReceived) {
+            setLoading(false);
+            return;
+        }
+        setLoading(true);
+        try {
+            if (userData.friendRequestsReceived.length > 0) {
+                const requestsQuery = query(collection(db, 'users'), where('uid', 'in', userData.friendRequestsReceived));
+                const requestsSnapshot = await getDocs(requestsQuery);
+                setRequests(requestsSnapshot.docs.map(doc => doc.data()));
+            } else {
+                setRequests([]);
+            }
+        } catch (error) {
+            console.error("Error fetching friend requests:", error);
+            setNotification("Could not load friend requests.", "error");
+        } finally {
+            setLoading(false);
+        }
+    }, [userData, setNotification]);
+
+    useEffect(() => {
+        fetchRequests();
+    }, [userData, fetchRequests]);
 
     const handleRequest = async (targetUid, accept) => {
         const batch = writeBatch(db);
@@ -945,54 +1006,34 @@ const FriendsList = ({ user, userData, setNotification, setChattingWith }) => {
             setNotification("Failed to process request.", "error");
         }
     };
-
-    const UserCard = ({ profile, children }) => (
-        <div className="bg-background p-3 rounded-lg flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-                <img src={API_ENDPOINTS.avatar(profile.avatarSeed)} alt="avatar" className="w-10 h-10 rounded-full" />
-                <div>
-                    <p className="font-semibold text-foreground">{profile.preferredName}</p>
-                    <p className="text-sm text-foreground/60">@{profile.username}</p>
-                </div>
-            </div>
-            <div>{children}</div>
-        </div>
-    );
-
+    
     return (
         <div className="bg-card p-6 rounded-2xl shadow-lg border border-border">
+            <h3 className="text-2xl font-serif text-primary mb-4">Notifications</h3>
             {loading && <p>Loading...</p>}
             {!loading && (
                 <>
-                    {requests.length > 0 && (
-                        <div className="mb-6">
-                            <h3 className="text-xl font-serif text-primary mb-3">Friend Requests</h3>
-                            <div className="space-y-2">
-                                {requests.map(req => (
-                                    <UserCard key={req.uid} profile={req}>
-                                        <div className="flex space-x-2">
-                                            <button onClick={() => handleRequest(req.uid, true)} className="p-2 bg-green-500/20 text-green-400 rounded-full hover:bg-green-500/40"><Check size={16}/></button>
-                                            <button onClick={() => handleRequest(req.uid, false)} className="p-2 bg-red-500/20 text-red-400 rounded-full hover:bg-red-500/40"><X size={16}/></button>
+                    {requests.length > 0 ? (
+                        <div className="space-y-2">
+                            {requests.map(req => (
+                                <div key={req.uid} className="bg-background p-3 rounded-lg flex items-center justify-between">
+                                    <div className="flex items-center space-x-3">
+                                        <img src={API_ENDPOINTS.avatar(req.avatarSeed)} alt="avatar" className="w-10 h-10 rounded-full" />
+                                        <div>
+                                            <p className="font-semibold text-foreground">{req.preferredName}</p>
+                                            <p className="text-sm text-foreground/60">@{req.username}</p>
                                         </div>
-                                    </UserCard>
-                                ))}
-                            </div>
+                                    </div>
+                                    <div className="flex space-x-2">
+                                        <button onClick={() => handleRequest(req.uid, true)} className="p-2 bg-green-500/20 text-green-400 rounded-full hover:bg-green-500/40"><Check size={16}/></button>
+                                        <button onClick={() => handleRequest(req.uid, false)} className="p-2 bg-red-500/20 text-red-400 rounded-full hover:bg-red-500/40"><X size={16}/></button>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
+                    ) : (
+                        <p className="text-foreground/60 text-center py-4">You have no new notifications.</p>
                     )}
-                    <div>
-                        <h3 className="text-xl font-serif text-primary mb-3">Your Friends</h3>
-                        {friends.length > 0 ? (
-                            <div className="space-y-2">
-                                {friends.map(friend => (
-                                    <UserCard key={friend.uid} profile={friend}>
-                                        <button onClick={() => setChattingWith(friend)} className="p-2 bg-primary/20 text-primary rounded-full hover:bg-primary/40"><MessageSquare size={16}/></button>
-                                    </UserCard>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-foreground/60 text-center py-4">You haven't added any friends yet.</p>
-                        )}
-                    </div>
                 </>
             )}
         </div>
@@ -1188,7 +1229,7 @@ const ChatView = ({ user, friend, onBack }) => {
 const Footer = ({ navigate, activeView, userData }) => {
     const navItems = [
         { name: 'Home', view: 'dashboard', icon: <Menu /> },
-        { name: 'Community', view: 'community', icon: <Users />, guestDisabled: true },
+        { name: 'Community', view: 'community', icon: <Users />, guestDisabled: true, notificationCount: userData?.friendRequestsReceived?.length || 0 },
         { name: 'Tarot', view: 'tarot', icon: <Feather /> },
         { name: 'Profile', view: 'profile', icon: <User />, guestDisabled: true }
     ];
@@ -1205,6 +1246,9 @@ const Footer = ({ navigate, activeView, userData }) => {
                             disabled={isDisabled}
                             className={`flex flex-col items-center justify-center w-full py-2 px-1 rounded-lg transition-all duration-300 relative text-sm ${activeView === item.view ? 'text-primary' : 'text-foreground/60'} ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:text-primary'}`}
                         >
+                            {item.notificationCount > 0 && (
+                                <span className="absolute top-1 right-3 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">{item.notificationCount}</span>
+                            )}
                             {React.cloneElement(item.icon, { size: 20 })}
                             <span className="text-xs mt-1">{item.name}</span>
                             {activeView === item.view && !isDisabled && (
