@@ -22,8 +22,7 @@ const provider = new GoogleAuthProvider();
 const createAvatar = (seed) => `https://api.dicebear.com/8.x/notionists/svg?seed=${seed}&backgroundColor=b6e3f4,c0aede,d1d4f9`;
 
 // --- Enhanced Tarot Interpretations ---
-const getInsightfulMeaning = (card, position) => {
-    const isReversed = Math.random() > 0.7; // 30% chance of being reversed for more dynamic readings
+const getInsightfulMeaning = (card, position, isReversed) => {
     const baseMeaning = isReversed ? card.meaning_rev : card.meaning_up;
     const positionMeanings = {
         // Celtic Cross
@@ -33,7 +32,7 @@ const getInsightfulMeaning = (card, position) => {
         4: "The Recent Past: This card represents events that have just occurred and are still influencing your present.",
         5: "The Crown/Potential Outcome: This represents the best possible outcome you can achieve, your conscious goal.",
         6: "The Near Future: This card shows what is likely to happen in the very near future, the next step on your path.",
-        7. "Your Attitude: This reflects your own feelings and perspective on the situation.",
+        7: "Your Attitude: This reflects your own feelings and perspective on the situation.",
         8: "External Influences: This card represents the people, energies, or events around you that are affecting the situation.",
         9: "Hopes and Fears: This reveals your deepest hopes and anxieties concerning the outcome.",
         10: "The Final Outcome: This card represents the culmination of the situation, the result if you continue on your current path.",
@@ -41,6 +40,8 @@ const getInsightfulMeaning = (card, position) => {
         'Past': "The Past: This card represents past events and influences that have shaped your current situation.",
         'Present': "The Present: This card reflects your current circumstances and challenges.",
         'Future': "The Future: This card offers a glimpse into the potential outcome and direction you are heading.",
+        // Single Card
+        'Situation': "The Card's Message: This card offers direct insight or advice regarding your current situation."
     };
 
     let interpretation = `**${card.name} ${isReversed ? '(Reversed)' : ''}**\n\n`;
@@ -146,10 +147,10 @@ const App = () => {
     return (
         <div className="min-h-screen bg-gray-900 text-white font-sans">
             <Header userData={userData} setView={setView} handleLogout={handleLogout} />
-            <main className="p-4 pb-20">
+            <main className="p-4 pb-24">
                 {view === 'dashboard' && <Dashboard setView={setView} />}
                 {view === 'horoscope' && <Horoscope zodiac={userData?.zodiac || 'Aries'} />}
-                {view === 'tarot' && <TarotReading user={user} />}
+                {view === 'tarot' && <TarotReading user={user} fetchUserData={fetchUserData} />}
                 {view === 'profile' && <Profile user={user} userData={userData} fetchUserData={fetchUserData} setView={setView}/>}
                 {view === 'past_readings' && <PastReadings readings={userData?.readings || []} />}
             </main>
@@ -159,7 +160,7 @@ const App = () => {
 };
 
 const Header = ({ userData, setView, handleLogout }) => (
-    <header className="bg-gray-800 p-4 flex justify-between items-center shadow-md sticky top-0 z-10">
+    <header className="bg-gray-800 p-4 flex justify-between items-center shadow-md sticky top-0 z-20">
         <h1 className="text-2xl font-bold font-serif text-purple-300">Wish Weaver</h1>
         <div className="flex items-center">
             <button onClick={() => setView('profile')} className="mr-4">
@@ -174,16 +175,19 @@ const Header = ({ userData, setView, handleLogout }) => (
 
 const Dashboard = ({ setView }) => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4">
-        {/* Dashboard cards */}
         <div onClick={() => setView('horoscope')} className="bg-gray-800 p-6 rounded-lg shadow-lg cursor-pointer hover:bg-gray-700 transition duration-300 transform hover:-translate-y-1">
             <h2 className="text-2xl font-bold mb-2 text-purple-300">Daily Horoscope</h2>
-            <p className="text-purple-100">Get your personalized astrological forecast for the day.</p>
+            <p className="text-purple-100">Get your personalized astrological forecast.</p>
         </div>
         <div onClick={() => setView('tarot')} className="bg-gray-800 p-6 rounded-lg shadow-lg cursor-pointer hover:bg-gray-700 transition duration-300 transform hover:-translate-y-1">
             <h2 className="text-2xl font-bold mb-2 text-purple-300">Tarot Reading</h2>
-            <p className="text-purple-100">Draw a card to gain insight and guidance.</p>
+            <p className="text-purple-100">Gain insight with a single card, 3-card, or Celtic Cross spread.</p>
         </div>
-         <div onClick={() => setView('profile')} className="bg-gray-800 p-6 rounded-lg shadow-lg cursor-pointer hover:bg-gray-700 transition duration-300 transform hover:-translate-y-1 col-span-1 md:col-span-2">
+        <div onClick={() => setView('past_readings')} className="bg-gray-800 p-6 rounded-lg shadow-lg cursor-pointer hover:bg-gray-700 transition duration-300 transform hover:-translate-y-1">
+            <h2 className="text-2xl font-bold mb-2 text-purple-300">Past Readings</h2>
+            <p className="text-purple-100">Review your saved tarot readings.</p>
+        </div>
+         <div onClick={() => setView('profile')} className="bg-gray-800 p-6 rounded-lg shadow-lg cursor-pointer hover:bg-gray-700 transition duration-300 transform hover:-translate-y-1">
             <h2 className="text-2xl font-bold mb-2 text-purple-300">Customize Profile</h2>
             <p className="text-purple-100">Personalize your avatar and zodiac sign.</p>
         </div>
@@ -221,22 +225,42 @@ const Horoscope = ({ zodiac }) => {
     );
 };
 
-const TarotReading = ({ user }) => {
+const TarotReading = ({ user, fetchUserData }) => {
     const [spreadType, setSpreadType] = useState(null);
     const [cards, setCards] = useState([]);
     const [loading, setLoading] = useState(false);
     const [reading, setReading] = useState(null);
     const [selectedCard, setSelectedCard] = useState(null);
+    const [notification, setNotification] = useState('');
 
-    const drawCards = async (num) => {
+    const drawCards = async (num, type) => {
         setLoading(true);
+        setSpreadType(type);
         setCards([]);
         setReading(null);
         setSelectedCard(null);
         try {
             const response = await fetch(`https://tarot-api-3hv5.onrender.com/api/v1/cards/random?n=${num}`);
             const data = await response.json();
-            setCards(data.cards);
+            const drawnCards = data.cards.map(card => ({...card, isReversed: Math.random() > 0.7}));
+            setCards(drawnCards);
+
+            const readingToSave = {
+                spreadType: type,
+                cards: drawnCards.map((card, i) => {
+                    let position;
+                    if (type === 'single') position = 'Situation';
+                    if (type === 'three-card') position = ['Past', 'Present', 'Future'][i];
+                    if (type === 'celtic-cross') position = i + 1;
+                    return {
+                        name: card.name,
+                        img: card.img,
+                        interpretation: getInsightfulMeaning(card, position, card.isReversed)
+                    };
+                })
+            };
+            setReading(readingToSave);
+
         } catch (error) {
             console.error("Error fetching tarot cards:", error);
         } finally {
@@ -246,32 +270,68 @@ const TarotReading = ({ user }) => {
     
     const handleSaveReading = async () => {
         if (!reading) return;
+        setNotification('Saving...');
         const userDocRef = doc(db, "users", user.uid);
         try {
             await updateDoc(userDocRef, {
                 readings: arrayUnion({ ...reading, date: new Date().toISOString() })
             });
-            alert("Reading saved!");
+            setNotification("Reading saved successfully!");
+            await fetchUserData(user.uid);
         } catch (error) {
             console.error("Error saving reading:", error);
+            setNotification("Error: Could not save reading.");
+        } finally {
+            setTimeout(() => setNotification(''), 3000);
         }
     };
+    
+    const renderCard = (card, index, position) => (
+        <div key={index} onClick={() => setSelectedCard({card, position})} className="cursor-pointer transition-transform transform hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/50">
+            <img 
+                src={`https://www.sacred-texts.com/tarot/pkt/img/${card.img}`} 
+                alt={card.name} 
+                className={`rounded-lg shadow-lg w-full ${card.isReversed ? 'rotate-180' : ''}`}
+                onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/200x350/1f2937/9333ea?text=Card+Art'; }}
+            />
+        </div>
+    );
 
     const renderSpread = () => {
+        if (loading) return <LoadingSpinner />;
+        if (cards.length === 0) return null;
+
         switch (spreadType) {
             case 'single':
-                return <div className="flex justify-center">{renderCard(cards[0], 0)}</div>;
+                return <div className="max-w-xs mx-auto">{renderCard(cards[0], 0, 'Situation')}</div>;
             case 'three-card':
                 return (
-                    <div className="grid grid-cols-3 gap-4">
-                        {cards.map((card, i) => renderCard(card, i, ['Past', 'Present', 'Future'][i]))}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+                        {cards.map((card, i) => (
+                            <div key={i}>
+                                <h3 className="text-center text-xl font-bold text-purple-300 mb-2">{['Past', 'Present', 'Future'][i]}</h3>
+                                {renderCard(card, i, ['Past', 'Present', 'Future'][i])}
+                            </div>
+                        ))}
                     </div>
                 );
             case 'celtic-cross':
                 return (
-                    <div className="grid grid-cols-3 gap-4 items-center">
-                        {/* Complex layout for Celtic Cross would be implemented here */}
-                        {cards.map((card, i) => renderCard(card, i, i + 1))}
+                    <div className="grid grid-cols-6 grid-rows-4 gap-2 md:gap-4 max-w-5xl mx-auto items-center justify-center p-4">
+                        <div className="col-start-6 row-span-4 flex flex-col justify-between h-full">
+                            {renderCard(cards[9], 9, 10)}
+                            {renderCard(cards[8], 8, 9)}
+                            {renderCard(cards[7], 7, 8)}
+                            {renderCard(cards[6], 6, 7)}
+                        </div>
+                        <div className="col-start-4 row-start-2 row-span-2">{renderCard(cards[5], 5, 6)}</div>
+                        <div className="col-start-3 row-start-1 col-span-2">{renderCard(cards[4], 4, 5)}</div>
+                        <div className="col-start-2 row-start-2 row-span-2">{renderCard(cards[3], 3, 4)}</div>
+                        <div className="col-start-3 row-start-4 col-span-2">{renderCard(cards[2], 2, 3)}</div>
+                        <div className="col-start-3 row-start-2 col-span-2 row-span-2 relative flex justify-center items-center">
+                            {renderCard(cards[0], 0, 1)}
+                            <div className="absolute transform rotate-90 scale-90">{renderCard(cards[1], 1, 2)}</div>
+                        </div>
                     </div>
                 );
             default:
@@ -279,25 +339,14 @@ const TarotReading = ({ user }) => {
         }
     };
     
-    const renderCard = (card, index, position) => (
-        <div key={index} onClick={() => setSelectedCard({card, position})} className="cursor-pointer transition-transform transform hover:scale-105">
-            <img 
-                src={`https://www.sacred-texts.com/tarot/pkt/img/${card.img}`} 
-                alt={card.name} 
-                className="rounded-lg shadow-lg"
-                onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/200x350/1f2937/9333ea?text=Card+Art'; }}
-            />
-        </div>
-    );
-
     if (!spreadType) {
         return (
-            <div className="text-center">
+            <div className="text-center max-w-md mx-auto">
                 <h2 className="text-3xl font-bold mb-6 text-purple-300">Choose a Tarot Spread</h2>
                 <div className="space-y-4">
-                    <button onClick={() => { setSpreadType('single'); drawCards(1); }} className="w-full bg-purple-600 p-4 rounded-lg">Simple Reading (1 Card)</button>
-                    <button onClick={() => { setSpreadType('three-card'); drawCards(3); }} className="w-full bg-purple-600 p-4 rounded-lg">Three-Card Spread</button>
-                    <button onClick={() => { setSpreadType('celtic-cross'); drawCards(10); }} className="w-full bg-purple-600 p-4 rounded-lg">Celtic Cross (10 Cards)</button>
+                    <button onClick={() => drawCards(1, 'single')} className="w-full bg-purple-600 p-4 rounded-lg hover:bg-purple-700 transition">Simple Reading (1 Card)</button>
+                    <button onClick={() => drawCards(3, 'three-card')} className="w-full bg-purple-600 p-4 rounded-lg hover:bg-purple-700 transition">Three-Card Spread</button>
+                    <button onClick={() => drawCards(10, 'celtic-cross')} className="w-full bg-purple-600 p-4 rounded-lg hover:bg-purple-700 transition">Celtic Cross (10 Cards)</button>
                 </div>
             </div>
         );
@@ -305,12 +354,16 @@ const TarotReading = ({ user }) => {
     
     return (
         <div>
-            {loading ? <LoadingSpinner /> : renderSpread()}
+            <div className="flex justify-center mb-4 space-x-4">
+                <button onClick={() => setSpreadType(null)} className="bg-gray-600 p-2 rounded">New Spread</button>
+                <button onClick={handleSaveReading} disabled={!reading || notification !== ''} className="bg-green-600 p-2 rounded disabled:bg-gray-500">{notification || 'Save Reading'}</button>
+            </div>
+            {renderSpread()}
             {selectedCard && (
-                <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-20" onClick={() => setSelectedCard(null)}>
-                    <div className="bg-gray-800 p-6 rounded-lg max-w-lg w-full text-white" onClick={(e) => e.stopPropagation()}>
-                        <pre className="whitespace-pre-wrap font-sans">{getInsightfulMeaning(selectedCard.card, selectedCard.position)}</pre>
-                        <button onClick={handleSaveReading} className="mt-4 bg-green-500 p-2 rounded">Save Reading</button>
+                <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-30 p-4" onClick={() => setSelectedCard(null)}>
+                    <div className="bg-gray-800 p-6 rounded-lg max-w-lg w-full text-white overflow-y-auto max-h-full" onClick={(e) => e.stopPropagation()}>
+                        <pre className="whitespace-pre-wrap font-sans">{getInsightfulMeaning(selectedCard.card, selectedCard.position, selectedCard.card.isReversed)}</pre>
+                        <button onClick={() => setSelectedCard(null)} className="mt-4 bg-purple-600 p-2 rounded w-full">Close</button>
                     </div>
                 </div>
             )}
@@ -334,13 +387,12 @@ const Profile = ({ user, userData, fetchUserData, setView }) => {
             await setDoc(userDocRef, { avatarSeed, zodiac }, { merge: true });
             await fetchUserData(user.uid);
             setMessage('Profile saved successfully!');
-            setTimeout(() => setMessage(''), 3000);
         } catch (error) {
             console.error("Error saving profile:", error);
             setMessage('Failed to save profile.');
-            setTimeout(() => setMessage(''), 3000);
         } finally {
             setSaving(false);
+            setTimeout(() => setMessage(''), 3000);
         }
     };
 
@@ -364,25 +416,49 @@ const Profile = ({ user, userData, fetchUserData, setView }) => {
                     {zodiacSigns.map(sign => <option key={sign} value={sign}>{sign}</option>)}
                 </select>
             </div>
-            <button onClick={handleSave} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-full w-full shadow-lg">
+            <button onClick={handleSave} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-full w-full shadow-lg disabled:bg-gray-500">
                 {saving ? 'Saving...' : 'Save Changes'}
             </button>
             {message && <p className="text-center mt-4 text-green-400">{message}</p>}
-            <button onClick={() => setView('past_readings')} className="mt-4 bg-blue-500 p-2 rounded w-full">View Past Readings</button>
+            <button onClick={() => setView('past_readings')} className="mt-4 bg-blue-500 hover:bg-blue-600 p-3 rounded w-full">View Past Readings</button>
         </div>
     );
 };
 
 const PastReadings = ({ readings }) => (
-    <div className="bg-gray-800 p-6 rounded-lg">
-        <h2 className="text-3xl font-bold mb-4 text-purple-300">Past Readings</h2>
-        <div className="space-y-4">
-            {readings.map((reading, index) => (
-                <div key={index} className="bg-gray-700 p-4 rounded-lg">
-                    <h3 className="text-xl font-bold">{new Date(reading.date).toLocaleDateString()}</h3>
-                    {/* Display saved reading details here */}
-                </div>
-            ))}
+    <div className="bg-gray-800 p-6 rounded-lg max-w-4xl mx-auto">
+        <h2 className="text-3xl font-bold mb-6 text-purple-300">Past Readings</h2>
+        <div className="space-y-6">
+            {readings.length === 0 ? (
+                <p className="text-center text-purple-200">You have no saved readings.</p>
+            ) : (
+                readings.slice().reverse().map((reading, index) => (
+                    <div key={index} className="bg-gray-700 p-4 rounded-lg shadow-inner">
+                        <h3 className="text-xl font-bold text-purple-300 capitalize">
+                            {reading.spreadType.replace('-', ' ')} Spread - {new Date(reading.date).toLocaleDateString()}
+                        </h3>
+                        <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                            {reading.cards.map((cardData, cardIndex) => (
+                                <div key={cardIndex}>
+                                    <details>
+                                        <summary className="cursor-pointer list-none">
+                                            <img 
+                                                src={`https://www.sacred-texts.com/tarot/pkt/img/${cardData.img}`} 
+                                                alt={cardData.name} 
+                                                className="rounded-lg shadow-md"
+                                                onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/200x350/1f2937/9333ea?text=Card+Art'; }}
+                                            />
+                                        </summary>
+                                        <div className="mt-2 bg-gray-800 p-2 rounded">
+                                            <pre className="whitespace-pre-wrap font-sans text-sm">{cardData.interpretation}</pre>
+                                        </div>
+                                    </details>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))
+            )}
         </div>
     </div>
 );
