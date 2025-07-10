@@ -20,11 +20,11 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
-// --- API ENDPOINTS (NOW POINTING TO OUR PROXY) ---
+// --- API ENDPOINTS (Updated tarotImageBase) ---
 const API_ENDPOINTS = {
-    horoscope: (sign, type, day) => `/api/horoscope?sign=${sign.toLowerCase()}&type=${type}&day=${day || 'TODAY'}`,
-    tarot: (count) => `/api/tarot?n=${count}`,
-    tarotImage: (imgId) => `https://www.sacred-texts.com/tarot/pkt/img/${imgId}`,
+    horoscope: (sign, type) => `/api/horoscope?sign=${sign.toLowerCase()}&type=${type}`,
+    // This now points to your local folder in /public/cards/
+    tarotImageBase: '/cards/',
     avatar: (seed) => `https://api.dicebear.com/8.x/notionists/svg?seed=${seed}&backgroundColor=f0e7f7,e0f0e9,d1d4f9`
 };
 
@@ -35,7 +35,7 @@ const useNavigation = (initialView = 'dashboard') => {
     const direction = useRef(1);
 
     const navigate = (newView) => {
-        if (newView === history[history.length - 1]) return; // Prevent navigating to the same view
+        if (newView === history[history.length - 1]) return;
         direction.current = 1;
         setHistory(prev => [...prev, newView]);
     };
@@ -59,10 +59,10 @@ const useNavigation = (initialView = 'dashboard') => {
     return { navigate, back, navigateToRoot, currentView, canGoBack, direction: direction.current };
 };
 
-
-// --- Tarot Logic (Unchanged) ---
+// --- Tarot Logic to use new JSON structure (Unchanged) ---
 const getInsightfulMeaning = (card, position, isReversed) => {
-    const baseMeaning = isReversed ? card.meaning_rev : card.meaning_up;
+    const baseMeanings = isReversed ? card.meanings.shadow : card.meanings.light;
+    
     const positionMeanings = {
         1: "The Heart of the Matter: This card represents the core of your situation, the central issue you are facing.",
         2: "The Obstacle: This card crosses you, representing the immediate challenge or block you must overcome.",
@@ -83,13 +83,13 @@ const getInsightfulMeaning = (card, position, isReversed) => {
     return {
         title: `${card.name} ${isReversed ? '(Reversed)' : ''}`,
         positionContext: position && positionMeanings[position] ? positionMeanings[position] : '',
-        meaning: baseMeaning,
-        description: card.desc
+        meaning: baseMeanings.join(' '),
+        description: `Keywords: ${card.keywords.join(', ')}.`
     };
 };
 
 
-// --- UI Components ---
+// --- UI Components (Unchanged) ---
 const LoadingSpinner = () => (
     <div className="flex justify-center items-center h-screen w-full bg-background">
         <motion.div
@@ -284,12 +284,11 @@ const Dashboard = ({ navigate, userData }) => {
     );
 };
 
-// --- HOROSCOPE: REFACTORED FOR MULTIPLE TIMEFRAMES ---
 const Horoscope = ({ zodiac }) => {
     const [horoscope, setHoroscope] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [timeframe, setTimeframe] = useState('daily'); // 'daily', 'weekly', 'monthly'
+    const [timeframe, setTimeframe] = useState('daily');
 
     const fetchHoroscope = useCallback(async () => {
         if (!zodiac) return;
@@ -356,9 +355,13 @@ const Horoscope = ({ zodiac }) => {
                 {error && <ErrorDisplay message={error} />}
 
                 {horoscope && (
-                    <p className="text-lg text-foreground/90 leading-relaxed font-serif whitespace-pre-line">
-                        {horoscope?.horoscope_data}
-                    </p>
+                    <div className="text-lg text-foreground/90 leading-relaxed font-serif">
+                        {horoscope.horoscope_data.split('\n').filter(p => p.trim() !== '').map((paragraph, index) => (
+                            <p key={index} className="mb-4">
+                                {paragraph}
+                            </p>
+                        ))}
+                    </div>
                 )}
             </div>
         </motion.div>
@@ -367,15 +370,42 @@ const Horoscope = ({ zodiac }) => {
 
 
 const TarotReading = ({ user, fetchUserData }) => {
+    const [fullDeck, setFullDeck] = useState([]);
     const [spreadType, setSpreadType] = useState(null);
     const [cards, setCards] = useState([]);
     const [revealed, setRevealed] = useState(new Set());
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selectedCard, setSelectedCard] = useState(null);
     const [notification, setNotification] = useState('');
 
-    const drawCards = async (num, type) => {
+    useEffect(() => {
+        const fetchDeck = async () => {
+            try {
+                const response = await fetch('/tarot-cards.json');
+                const data = await response.json();
+                if (data && data.cards) {
+                    setFullDeck(data.cards);
+                } else {
+                    // Adjusted for the provided JSON structure
+                    setFullDeck(data.root.cards);
+                }
+            } catch (err) {
+                console.error("Error fetching local tarot deck:", err);
+                setError("Could not load the deck of cards. Please ensure tarot-cards.json is in the public folder.");
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchDeck();
+    }, []);
+
+    const drawCards = (num, type) => {
+        if (fullDeck.length === 0) {
+            setError("The deck is not available to draw from.");
+            return;
+        }
+
         setLoading(true);
         setError(null);
         setSpreadType(type);
@@ -383,23 +413,15 @@ const TarotReading = ({ user, fetchUserData }) => {
         setRevealed(new Set());
         setSelectedCard(null);
 
-        try {
-            const response = await fetch(API_ENDPOINTS.tarot(num));
-            const data = await response.json();
+        const shuffled = [...fullDeck].sort(() => 0.5 - Math.random());
+        const drawnCards = shuffled.slice(0, num).map(card => ({
+            ...card,
+            isReversed: Math.random() > 0.5,
+            id: crypto.randomUUID()
+        }));
 
-            if (!response.ok) {
-                throw new Error(data.error || "Failed to draw cards.");
-            }
-            
-            const drawnCards = data.cards.map(card => ({ ...card, isReversed: Math.random() > 0.7, id: crypto.randomUUID() }));
-            setCards(drawnCards);
-
-        } catch (err) {
-            console.error("Error fetching tarot cards:", err);
-            setError(err.message || 'The Tarot API is currently down. Please try again soon.');
-        } finally {
-            setLoading(false);
-        }
+        setCards(drawnCards);
+        setLoading(false);
     };
     
     const handleSaveReading = async () => {
@@ -473,7 +495,7 @@ const TarotReading = ({ user, fetchUserData }) => {
                     </div>
                     <div className="absolute w-full h-full backface-hidden [transform:rotateY(180deg)] rounded-xl shadow-2xl shadow-glow-primary overflow-hidden">
                         <img
-                            src={API_ENDPOINTS.tarotImage(card.img)}
+                            src={`${API_ENDPOINTS.tarotImageBase}${card.img}`}
                             alt={card.name}
                             className={`w-full h-full object-cover rounded-xl ${card.isReversed ? 'rotate-180' : ''}`}
                             onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/200x350/1f2937/9333ea?text=Card+Art'; }}
@@ -489,6 +511,7 @@ const TarotReading = ({ user, fetchUserData }) => {
             <div className="text-center max-w-md mx-auto p-4">
                 <h2 className="text-3xl font-serif mb-8 text-foreground">Choose a Tarot Spread</h2>
                 {error && <div className="mb-4"><ErrorDisplay message={error}/></div>}
+                {loading && <div className="flex justify-center"><LoadingSpinner/></div>}
                 <div className="space-y-5">
                     {[['single', 'Simple Reading (1 Card)', 1], ['three-card', 'Three-Card Spread', 3], ['celtic-cross', 'Celtic Cross', 10]].map(([type, label, count], i) => (
                         <motion.button
@@ -497,10 +520,10 @@ const TarotReading = ({ user, fetchUserData }) => {
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: i * 0.15 }}
                             onClick={() => drawCards(count, type)}
-                            disabled={loading}
+                            disabled={loading || fullDeck.length === 0}
                             className="w-full bg-card border border-border p-4 rounded-xl hover:border-primary text-card-foreground font-semibold transition-all hover:bg-foreground/5 disabled:opacity-50"
                         >
-                            {loading ? "Drawing..." : label}
+                            {label}
                         </motion.button>
                     ))}
                 </div>
@@ -667,7 +690,7 @@ const PastReadings = ({ readings }) => {
                                             {reading.cards.map((cardData, cardIndex) => (
                                                 <div key={cardIndex}>
                                                     <img
-                                                        src={API_ENDPOINTS.tarotImage(cardData.img)}
+                                                        src={`${API_ENDPOINTS.tarotImageBase}${cardData.img}`}
                                                         alt={cardData.name}
                                                         className="rounded-lg shadow-sm"
                                                     />
