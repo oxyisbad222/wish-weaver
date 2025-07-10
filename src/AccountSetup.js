@@ -6,6 +6,12 @@ import { Sparkles } from 'lucide-react';
 
 const db = getFirestore();
 
+const Button = ({ onClick, children, className = '', disabled = false }) => {
+  const baseClasses = 'font-semibold py-3 px-6 rounded-lg transition-all duration-300 ease-in-out transform flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed';
+  const variantClasses = 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 hover:shadow-primary/30';
+  return <button onClick={onClick} className={`${baseClasses} ${variantClasses} ${className}`} disabled={disabled}>{children}</button>;
+};
+
 const AccountSetup = ({ user, onSetupComplete }) => {
     const [step, setStep] = useState(1);
     const [username, setUsername] = useState('');
@@ -19,8 +25,10 @@ const AccountSetup = ({ user, onSetupComplete }) => {
     const zodiacSigns = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
 
     useEffect(() => {
-        setAvatarSeed(user.displayName || 'welcome');
-    }, [user.displayName]);
+        if(user?.displayName) {
+            setAvatarSeed(user.displayName);
+        }
+    }, [user]);
     
     const checkUsername = async () => {
         if (username.length < 3) {
@@ -54,7 +62,7 @@ const AccountSetup = ({ user, onSetupComplete }) => {
         try {
             await updateDoc(userDocRef, {
                 username,
-                preferredName,
+                preferredName: preferredName || user.displayName.split(' ')[0],
                 pronouns,
                 zodiac,
                 avatarSeed,
@@ -88,7 +96,7 @@ const AccountSetup = ({ user, onSetupComplete }) => {
                     <div className="w-full">
                         <h2 className="text-2xl font-serif text-primary mb-2">Create Your Username</h2>
                         <p className="text-foreground/70 mb-4">This will be your unique name in the Wish Weaver universe.</p>
-                        <input type="text" value={username} onChange={(e) => setUsername(e.target.value.toLowerCase())} placeholder="e.g., cosmicdreamer" className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary"/>
+                        <input type="text" value={username} onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))} placeholder="e.g., cosmicdreamer" className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary"/>
                         {usernameError && <p className="text-red-400 text-sm mt-2">{usernameError}</p>}
                     </div>
                 );
@@ -107,7 +115,7 @@ const AccountSetup = ({ user, onSetupComplete }) => {
                             </div>
                              <div>
                                 <label htmlFor="zodiac" className="text-foreground/80 mb-2 block">Your Zodiac Sign</label>
-                                <select id="zodiac" value={zodiac} onChange={(e) => setZodiac(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary appearance-none">
+                                <select id="zodiac" value={zodiac} onChange={(e) => setZodiac(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary appearance-none text-center">
                                     {zodiacSigns.map(sign => <option key={sign} value={sign}>{sign}</option>)}
                                 </select>
                             </div>
@@ -140,9 +148,9 @@ const AccountSetup = ({ user, onSetupComplete }) => {
                     </motion.div>
                 </AnimatePresence>
                 <div className="mt-6 flex justify-between items-center">
-                    {step > 1 && <button onClick={() => setStep(step - 1)} className="text-sm text-foreground/70 hover:underline">Back</button>}
+                    <button onClick={() => setStep(step - 1)} disabled={step === 1} className="text-sm text-foreground/70 hover:underline disabled:opacity-0">Back</button>
                     <div className="flex-grow"></div>
-                    {step < 3 && <Button onClick={handleNext} disabled={isLoading}>{isLoading ? 'Checking...' : 'Next'}</Button>}
+                    {step < 3 && <Button onClick={handleNext} disabled={isLoading || (step === 1 && !username)}>{isLoading ? 'Checking...' : 'Next'}</Button>}
                     {step === 3 && <Button onClick={handleFinish} disabled={isLoading}>{isLoading ? 'Finishing...' : 'Finish'}</Button>}
                 </div>
             </div>

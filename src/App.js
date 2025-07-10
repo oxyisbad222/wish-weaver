@@ -3,7 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, signInAnonymously } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle, Info, Sparkles } from 'lucide-react';
+import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle, Info } from 'lucide-react';
 import AccountSetup from './AccountSetup';
 
 const firebaseConfig = {
@@ -526,8 +526,8 @@ const TarotReading = ({ user, fetchUserData }) => {
                         </div>
                     )}
                      {spreadType === 'celtic-cross' && cards.length === 10 && (
-                         <div className="w-full max-w-sm mx-auto p-2">
-                             <div className="grid grid-cols-3 grid-rows-4 gap-2">
+                         <div className="w-full max-w-lg mx-auto p-2 flex space-x-2">
+                             <div className="flex-1 grid grid-cols-3 grid-rows-4 gap-2">
                                 <div className="col-start-2 row-start-1"><CardDisplay card={cards[4]}/></div>
                                 <div className="col-start-1 row-start-2"><CardDisplay card={cards[3]}/></div>
                                 <div className="col-start-2 row-start-2"><CardDisplay card={cards[0]}/></div>
@@ -535,7 +535,7 @@ const TarotReading = ({ user, fetchUserData }) => {
                                 <div className="col-start-2 row-start-3"><CardDisplay card={cards[2]}/></div>
                                 <div className="col-start-2 row-start-4"><CardDisplay card={cards[1]}/></div>
                              </div>
-                             <div className="mt-4 border-l-2 border-primary/50 pl-4 ml-auto w-1/3">
+                             <div className="flex-shrink-0 w-1/4 border-l-2 border-primary/50 pl-2">
                                 <div className="space-y-2">
                                     <CardDisplay card={cards[9]}/>
                                     <CardDisplay card={cards[8]}/>
@@ -590,7 +590,7 @@ const Profile = ({ user, userData, fetchUserData, navigate }) => {
                     <Modal onClose={() => setShowInfo(false)}>
                         <h2 className="text-2xl font-serif text-primary mb-4">About Avatar Seeds</h2>
                         <p className="text-foreground/90 mb-2">Your avatar is generated from a unique "seed" string. Any text can be a seed: your name, a favorite word, or just random characters.</p>
-                        <p className="text-foreground/90 mb-4">Changing the seed will create a completely new avatar. The DiceBear 'Notionists' style allows for over a quadrillion unique combinations, so your avatar can be truly unique!</p>
+                        <p className="text-foreground/90 mb-4">Changing the seed will create a completely new avatar. The DiceBear 'Notionists' style allows for an almost limitless number of unique combinations, so your avatar can be truly unique!</p>
                         <Button onClick={() => setShowInfo(false)} className="w-full">Got it</Button>
                     </Modal>
                 )}
