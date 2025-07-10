@@ -46,7 +46,7 @@ const useNavigation = (initialView = 'dashboard') => {
             setHistory(prev => prev.slice(0, -1));
         }
     };
-    
+
     const navigateToRoot = () => {
         direction.current = -1;
         setHistory(['dashboard']);
@@ -135,14 +135,14 @@ const Modal = ({ children, onClose }) => (
     </motion.div>
 );
 
-const Button = ({ onClick, children, variant = 'primary', className = '' }) => {
-  const baseClasses = 'font-semibold py-3 px-6 rounded-lg transition-all duration-300 ease-in-out transform flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background';
+const Button = ({ onClick, children, variant = 'primary', className = '', disabled = false }) => {
+  const baseClasses = 'font-semibold py-3 px-6 rounded-lg transition-all duration-300 ease-in-out transform flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed';
   const variants = {
     primary: 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 hover:shadow-primary/30',
     secondary: 'bg-transparent border border-primary text-primary hover:bg-primary hover:text-primary-foreground',
     ghost: 'hover:bg-primary/10 text-primary',
   };
-  return <button onClick={onClick} className={`${baseClasses} ${variants[variant]} ${className}`}>{children}</button>;
+  return <button onClick={onClick} className={`${baseClasses} ${variants[variant]} ${className}`} disabled={disabled}>{children}</button>;
 };
 
 // --- Page/View Components ---
@@ -229,11 +229,11 @@ const Header = ({ userData, onLogout, onLogoClick, onAvatarClick, onBack, canGoB
             </h1>
         </div>
         <div className="flex items-center space-x-4">
-            <img 
-                src={API_ENDPOINTS.avatar(userData?.avatarSeed || userData?.displayName || 'guest')} 
-                alt="avatar" 
+            <img
+                src={API_ENDPOINTS.avatar(userData?.avatarSeed || userData?.displayName || 'guest')}
+                alt="avatar"
                 onClick={onAvatarClick}
-                className="w-10 h-10 rounded-full border-2 border-primary/50 cursor-pointer hover:border-primary transition-colors" 
+                className="w-10 h-10 rounded-full border-2 border-primary/50 cursor-pointer hover:border-primary transition-colors"
             />
              <button onClick={onLogout} className="p-2 rounded-full hover:bg-foreground/10 transition-colors">
                 <LogOut className="text-foreground/70" size={20}/>
@@ -326,7 +326,7 @@ const Horoscope = ({ zodiac }) => {
             {label}
         </button>
     );
-    
+
     return (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 sm:p-6">
             <div className="bg-card p-6 rounded-2xl shadow-lg border border-border max-w-3xl mx-auto">
@@ -341,7 +341,7 @@ const Horoscope = ({ zodiac }) => {
                        <TimeframeButton value="monthly" label="Monthly" />
                     </div>
                 </div>
-                
+
                 {loading ? (
                     <div className="space-y-4">
                         <div className="h-4 bg-foreground/10 rounded w-full animate-pulse"></div>
@@ -387,7 +387,7 @@ const TarotReading = ({ user, fetchUserData, navigate }) => {
             setLoading(false);
         }
     };
-    
+
     const handleSaveReading = async () => {
         // (Logic unchanged)
         if (user.isAnonymous) {
@@ -492,7 +492,7 @@ const TarotReading = ({ user, fetchUserData, navigate }) => {
             </div>
         );
     }
-    
+
     return (
         <div className="p-4">
             <Notification message={notification} />
@@ -579,7 +579,7 @@ const Profile = ({ user, userData, fetchUserData, navigate }) => {
         <div className="bg-card p-6 rounded-2xl shadow-lg max-w-lg mx-auto border border-border">
             <Notification message={notification} />
             <h2 className="text-3xl font-serif mb-6 text-foreground text-center">Profile & Settings</h2>
-            
+
             <div className="flex flex-col items-center mb-6">
                 <img src={API_ENDPOINTS.avatar(avatarSeed)} alt="avatar" className="w-32 h-32 rounded-full border-4 border-primary/40 mb-4" />
                 <label htmlFor="avatarSeed" className="text-foreground/80 mb-2">Avatar Customization</label>
@@ -596,17 +596,17 @@ const Profile = ({ user, userData, fetchUserData, navigate }) => {
 
             <div className="mb-8">
                 <label htmlFor="zodiac" className="text-foreground/80 mb-2 block text-center">Zodiac Sign</label>
-                <select 
-                    id="zodiac" 
-                    value={zodiac} 
-                    onChange={(e) => setZodiac(e.target.value)} 
+                <select
+                    id="zodiac"
+                    value={zodiac}
+                    onChange={(e) => setZodiac(e.target.value)}
                     className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors appearance-none text-center"
                     disabled={user.isAnonymous}
                 >
                     {zodiacSigns.map(sign => <option key={sign} value={sign}>{sign}</option>)}
                 </select>
             </div>
-            
+
             <Button onClick={handleSave} className="w-full" disabled={user.isAnonymous}>Save Changes</Button>
             {!user.isAnonymous &&
                 <Button onClick={() => navigate('past_readings')} variant="ghost" className="w-full mt-2">View Reading Journal</Button>
@@ -692,8 +692,8 @@ const Footer = ({ navigate, activeView }) => {
                         {React.cloneElement(item.icon, { size: 20 })}
                         <span className="text-xs mt-1">{item.name}</span>
                         {activeView === item.view && (
-                            <motion.div 
-                                layoutId="active-pill" 
+                            <motion.div
+                                layoutId="active-pill"
                                 className="absolute bottom-0 h-1 w-8 bg-primary rounded-full"
                                 transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                             ></motion.div>
@@ -793,8 +793,8 @@ const App = () => {
 
     return (
         <div className="bg-background text-foreground font-sans min-h-screen">
-            <Header 
-                userData={userData} 
+            <Header
+                userData={userData}
                 onLogout={handleLogout}
                 onLogoClick={navigateToRoot}
                 onAvatarClick={() => navigate('profile')}
@@ -812,7 +812,7 @@ const App = () => {
                         transition={pageTransition}
                     >
                         <CurrentView />
-                    </motion.motion.div>
+                    </motion.div>
                 </AnimatePresence>
             </main>
             <Footer navigate={navigate} activeView={currentView} />
