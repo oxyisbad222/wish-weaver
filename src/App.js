@@ -3,7 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, signInAnonymously } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle, Info } from 'lucide-react';
+import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle, Info, Users, MessageSquare, Sparkles } from 'lucide-react';
 import AccountSetup from './AccountSetup';
 
 const firebaseConfig = {
@@ -59,26 +59,17 @@ const getInsightfulMeaning = (card, position, isReversed) => {
     const baseMeanings = isReversed ? card.meanings.shadow : card.meanings.light;
     
     const positionMeanings = {
-        1: "The Heart of the Matter",
-        2: "The Obstacle",
-        3: "The Foundation",
-        4: "The Recent Past",
-        5: "The Crown/Potential",
-        6: "The Near Future",
-        7: "Your Attitude",
-        8: "External Influences",
-        9: "Hopes and Fears",
-        10: "The Final Outcome",
-        'Past': "The Past",
-        'Present': "The Present",
-        'Future': "The Future",
-        'Situation': "The Card's Message"
+        1: "The Heart of the Matter", 2: "The Obstacle", 3: "The Foundation",
+        4: "The Recent Past", 5: "The Crown/Potential", 6: "The Near Future",
+        7: "Your Attitude", 8: "External Influences", 9: "Hopes and Fears",
+        10: "The Final Outcome", 'Past': "The Past", 'Present': "The Present",
+        'Future': "The Future", 'Situation': "The Card's Message"
     };
 
     return {
         title: `${card.name} ${isReversed ? '(Reversed)' : ''}`,
         positionContext: position && positionMeanings[position] ? positionMeanings[position] : '',
-        meaning: baseMeanings.join(' '),
+        meaning: baseMeanings,
         description: `Keywords: ${card.keywords.join(', ')}.`
     };
 };
@@ -247,6 +238,8 @@ const Dashboard = ({ navigate, userData }) => {
         { view: 'horoscope', title: 'Horoscope', desc: 'Daily, weekly, and monthly forecasts.', icon: <Star/> },
         { view: 'tarot', title: 'Tarot Reading', desc: 'Gain insight with a powerful card spread.', icon: <Feather/> },
         { view: 'past_readings', title: 'Reading Journal', desc: 'Review your saved tarot readings.', icon: <BookOpen/> },
+        { view: 'community', title: 'Community', desc: 'Connect with friends & share affirmations.', icon: <Users/> },
+        { view: 'ouija', title: 'Ouija Room', desc: 'Communicate with the other side.', icon: <Sparkles/> },
     ];
 
     return (
@@ -345,9 +338,9 @@ const Horoscope = ({ zodiac }) => {
                 {error && <ErrorDisplay message={error} />}
 
                 {horoscope && (
-                    <div className="text-lg text-foreground/90 leading-relaxed font-serif">
+                    <div className="text-lg text-foreground/90 leading-relaxed font-serif space-y-4">
                         {horoscope.horoscope_data.split('\n').filter(p => p.trim() !== '').map((paragraph, index) => (
-                            <p key={index} className="mb-4">
+                            <p key={index}>
                                 {paragraph}
                             </p>
                         ))}
@@ -376,8 +369,6 @@ const TarotReading = ({ user, fetchUserData }) => {
                 const data = await response.json();
                 if (data && data.cards) {
                     setFullDeck(data.cards);
-                } else if (data && data.root && data.root.cards) {
-                    setFullDeck(data.root.cards);
                 } else {
                     throw new Error("Invalid JSON structure.");
                 }
@@ -484,15 +475,19 @@ const TarotReading = ({ user, fetchUserData }) => {
         );
     }
     
+    const interpretation = selectedCard ? getInsightfulMeaning(selectedCard, null, selectedCard.isReversed) : null;
+
     return (
         <div className="p-4">
             <Notification message={notification} />
             <AnimatePresence>
-                {selectedCard && (
+                {selectedCard && interpretation && (
                     <Modal onClose={() => setSelectedCard(null)}>
-                        <h2 className="text-3xl font-serif text-primary mb-2">{getInsightfulMeaning(selectedCard, null, selectedCard.isReversed).title}</h2>
-                        <p className="text-lg text-foreground/90 leading-relaxed font-serif">{getInsightfulMeaning(selectedCard, null, selectedCard.isReversed).meaning}</p>
-                        <p className="text-md text-foreground/60 mt-4 font-sans">{getInsightfulMeaning(selectedCard, null, selectedCard.isReversed).description}</p>
+                        <h2 className="text-3xl font-serif text-primary mb-2">{interpretation.title}</h2>
+                        <div className="text-lg text-foreground/90 leading-relaxed font-serif space-y-3">
+                            {interpretation.meaning.map((p, i) => <p key={i}>{p}</p>)}
+                        </div>
+                        <p className="text-md text-foreground/60 mt-4 font-sans">{interpretation.description}</p>
                     </Modal>
                 )}
                 {isSaving && (
@@ -600,6 +595,10 @@ const Profile = ({ user, userData, fetchUserData, navigate }) => {
             <div className="flex flex-col items-center mb-6">
                 <img src={API_ENDPOINTS.avatar(avatarSeed)} alt="avatar" className="w-32 h-32 rounded-full border-4 border-primary/40 mb-4" />
                 <div className="w-full space-y-4">
+                    <div>
+                        <label className="text-foreground/80 mb-2 block">Username</label>
+                        <input type="text" value={`@${userData?.username || ''}`} className="bg-input/50 text-foreground/70 p-3 rounded-lg w-full border border-border" disabled/>
+                    </div>
                      <div>
                         <label htmlFor="preferredName" className="text-foreground/80 mb-2 block">Preferred Name</label>
                         <input id="preferredName" type="text" value={preferredName} onChange={(e) => setPreferredName(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors" disabled={user.isAnonymous}/>
@@ -665,11 +664,18 @@ const PastReadings = ({ readings }) => {
     );
 };
 
+const PlaceholderView = ({ title }) => (
+    <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+        <h2 className="text-4xl font-serif text-primary mb-4">{title}</h2>
+        <p className="text-foreground/70 max-w-md">This feature is coming soon! We're working hard to bring this to life. Stay tuned for updates.</p>
+    </div>
+);
+
 
 const Footer = ({ navigate, activeView }) => {
     const navItems = [
         { name: 'Home', view: 'dashboard', icon: <Menu /> },
-        { name: 'Horoscope', view: 'horoscope', icon: <Star /> },
+        { name: 'Community', view: 'community', icon: <Users /> },
         { name: 'Tarot', view: 'tarot', icon: <Feather /> },
         { name: 'Profile', view: 'profile', icon: <User /> }
     ];
@@ -699,17 +705,22 @@ const App = () => {
 
     const fetchUserData = useCallback(async (uid) => {
         if (!uid) return;
-        setLoadingAuth(true);
-        const userDocRef = doc(db, "users", uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-            setUserData(userDoc.data());
+        try {
+            const userDocRef = doc(db, "users", uid);
+            const userDoc = await getDoc(userDocRef);
+            if (userDoc.exists()) {
+                setUserData(userDoc.data());
+            }
+        } catch (error) {
+            console.error("Error fetching user data:", error);
+        } finally {
+            setLoadingAuth(false);
         }
-        setLoadingAuth(false);
     }, []);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+            setLoadingAuth(true);
             if (currentUser) {
                 setUser(currentUser);
                 if (!currentUser.isAnonymous) {
@@ -742,7 +753,7 @@ const App = () => {
 
     const CurrentView = () => {
         if (userData && userData.needsSetup) {
-            return <AccountSetup user={user} onSetupComplete={() => fetchUserData(user.uid)} />;
+            return <AccountSetup user={user} db={db} onSetupComplete={() => fetchUserData(user.uid)} />;
         }
         switch (currentView) {
             case 'dashboard': return <Dashboard navigate={navigate} userData={userData}/>;
@@ -750,6 +761,8 @@ const App = () => {
             case 'tarot': return <TarotReading user={user} fetchUserData={fetchUserData} />;
             case 'profile': return <Profile user={user} userData={userData} fetchUserData={fetchUserData} navigate={navigate} />;
             case 'past_readings': return <PastReadings readings={userData?.readings || []} />;
+            case 'community': return <PlaceholderView title="Community Hub" />;
+            case 'ouija': return <PlaceholderView title="Ouija Room" />;
             default: return <Dashboard navigate={navigate} userData={userData}/>;
         }
     };
