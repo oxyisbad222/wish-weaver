@@ -16,7 +16,6 @@ const firebaseConfig = {
     appId: process.env.REACT_APP_APPID
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -375,16 +374,38 @@ const Horoscope = ({ zodiac }) => {
     );
 };
 
-const CardDisplay = ({ card, positionLabel }) => {
-    const [isFlipped, setIsFlipped] = useState(false);
+const CelticCrossLayout = ({ cards, onCardClick }) => {
+    const positions = [
+        "1. Heart of the Matter", "2. The Obstacle", "3. The Foundation", "4. The Recent Past",
+        "5. The Crown", "6. The Near Future", "7. Your Attitude", "8. External Influences",
+        "9. Hopes and Fears", "10. The Outcome"
+    ];
 
     return (
-        <div className="flex flex-col items-center text-center">
+        <div className="w-full max-w-xl mx-auto p-4 grid grid-cols-4 sm:grid-cols-10 gap-2 sm:gap-4" style={{ gridTemplateRows: 'repeat(4, auto)' }}>
+            <div className="col-start-2 sm:col-start-4 sm:row-start-2"><CardDisplay card={cards[0]} positionLabel={positions[0]} onCardClick={onCardClick} /></div>
+            <div className="col-start-2 sm:col-start-4 sm:row-start-2 -rotate-90"><CardDisplay card={cards[1]} positionLabel={positions[1]} onCardClick={onCardClick} /></div>
+            
+            <div className="col-start-3 sm:col-start-5 sm:row-start-2"><CardDisplay card={cards[4]} positionLabel={positions[4]} onCardClick={onCardClick} /></div>
+            <div className="col-start-1 sm:col-start-3 sm:row-start-2"><CardDisplay card={cards[3]} positionLabel={positions[3]} onCardClick={onCardClick} /></div>
+            <div className="col-start-2 sm:col-start-4 sm:row-start-3"><CardDisplay card={cards[2]} positionLabel={positions[2]} onCardClick={onCardClick} /></div>
+            <div className="col-start-2 sm:col-start-4 sm:row-start-1"><CardDisplay card={cards[5]} positionLabel={positions[5]} onCardClick={onCardClick} /></div>
+
+            <div className="col-start-4 sm:col-start-7 sm:row-start-4"><CardDisplay card={cards[6]} positionLabel={positions[6]} onCardClick={onCardClick} /></div>
+            <div className="col-start-4 sm:col-start-7 sm:row-start-3"><CardDisplay card={cards[7]} positionLabel={positions[7]} onCardClick={onCardClick} /></div>
+            <div className="col-start-4 sm:col-start-7 sm:row-start-2"><CardDisplay card={cards[8]} positionLabel={positions[8]} onCardClick={onCardClick} /></div>
+            <div className="col-start-4 sm:col-start-7 sm:row-start-1"><CardDisplay card={cards[9]} positionLabel={positions[9]} onCardClick={onCardClick} /></div>
+        </div>
+    );
+};
+
+const CardDisplay = ({ card, positionLabel, onCardClick }) => {
+    return (
+        <div className="flex flex-col items-center text-center cursor-pointer" onClick={() => onCardClick(card)}>
             <motion.div 
-              className="relative w-full aspect-[2/3.5] bg-gray-700 rounded-xl overflow-hidden cursor-pointer"
+              className="relative w-full aspect-[2/3.5] bg-gray-700 rounded-xl overflow-hidden"
               whileHover={{ scale: 1.05, y: -5 }}
               transition={{ type: 'spring', stiffness: 300 }}
-              onClick={() => setIsFlipped(!isFlipped)}
             >
                <img
                     src={`${API_ENDPOINTS.tarotImageBase}${card.img}`}
@@ -400,34 +421,6 @@ const CardDisplay = ({ card, positionLabel }) => {
         </div>
     );
 };
-
-const CelticCrossLayout = ({ cards, onCardClick }) => {
-    const positions = [
-        "1. Heart of the Matter", "2. The Obstacle", "3. The Foundation", "4. The Recent Past",
-        "5. The Crown", "6. The Near Future", "7. Your Attitude", "8. External Influences",
-        "9. Hopes and Fears", "10. The Outcome"
-    ];
-
-    return (
-        <div className="w-full max-w-4xl mx-auto p-4 grid grid-cols-4 sm:grid-cols-10 gap-2 sm:gap-4" style={{ gridTemplateRows: 'repeat(4, auto)' }}>
-            {/* The Cross */}
-            <div className="col-start-2 sm:col-start-4 sm:row-start-2"><CardDisplay card={cards[0]} positionLabel={positions[0]} /></div>
-            <div className="col-start-2 sm:col-start-4 sm:row-start-2 -rotate-90"><CardDisplay card={cards[1]} positionLabel={positions[1]} /></div>
-            
-            <div className="col-start-3 sm:col-start-5 sm:row-start-2"><CardDisplay card={cards[4]} positionLabel={positions[4]} /></div>
-            <div className="col-start-1 sm:col-start-3 sm:row-start-2"><CardDisplay card={cards[3]} positionLabel={positions[3]} /></div>
-            <div className="col-start-2 sm:col-start-4 sm:row-start-3"><CardDisplay card={cards[2]} positionLabel={positions[2]} /></div>
-            <div className="col-start-2 sm:col-start-4 sm:row-start-1"><CardDisplay card={cards[5]} positionLabel={positions[5]} /></div>
-
-            {/* The Staff */}
-            <div className="col-start-4 sm:col-start-7 sm:row-start-4"><CardDisplay card={cards[6]} positionLabel={positions[6]} /></div>
-            <div className="col-start-4 sm:col-start-7 sm:row-start-3"><CardDisplay card={cards[7]} positionLabel={positions[7]} /></div>
-            <div className="col-start-4 sm:col-start-7 sm:row-start-2"><CardDisplay card={cards[8]} positionLabel={positions[8]} /></div>
-            <div className="col-start-4 sm:col-start-7 sm:row-start-1"><CardDisplay card={cards[9]} positionLabel={positions[9]} /></div>
-        </div>
-    );
-};
-
 
 const TarotReading = ({ user, showNotification }) => {
     const [fullDeck, setFullDeck] = useState([]);
@@ -487,7 +480,7 @@ const TarotReading = ({ user, showNotification }) => {
             title: readingTitle,
             spreadType,
             date: new Date().toISOString(),
-            notes: "", // Add notes field
+            notes: "", 
             cards: cards.map((card, i) => {
                 let position;
                 if (spreadType === 'single') position = 'Situation';
@@ -578,13 +571,13 @@ const TarotReading = ({ user, showNotification }) => {
 
             {cards && cards.length > 0 && (
                 <div className="max-w-5xl mx-auto">
-                    {spreadType === 'single' && <div className="w-40 sm:w-48 mx-auto"><CardDisplay card={cards[0]}/></div>}
+                    {spreadType === 'single' && <div className="w-40 sm:w-48 mx-auto"><CardDisplay card={cards[0]} onCardClick={setSelectedCard}/></div>}
                     {spreadType === 'three-card' && (
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-8">
                             {cards.map((card, i) => (
                                 <div key={card.id}>
                                     <h3 className="text-center text-lg sm:text-xl font-serif text-foreground mb-3">{['Past', 'Present', 'Future'][i]}</h3>
-                                    <div className="w-40 sm:w-48 mx-auto"><CardDisplay card={card}/></div>
+                                    <div className="w-40 sm:w-48 mx-auto"><CardDisplay card={card} onCardClick={setSelectedCard}/></div>
                                 </div>
                             ))}
                         </div>
@@ -634,6 +627,11 @@ const Profile = ({ user, userData, showNotification }) => {
             return;
         }
 
+        if (!userData?.username) {
+            showNotification("Cannot delete account: User data is not fully loaded.", "error");
+            return;
+        }
+
         try {
             const batch = writeBatch(db);
             const userDocRef = doc(db, "users", user.uid);
@@ -657,7 +655,6 @@ const Profile = ({ user, userData, showNotification }) => {
         setIsChangingUsername(true);
         const newUsernameLower = newUsername.trim().toLowerCase();
         
-        // Basic validation
         if (newUsernameLower.length < 3 || newUsernameLower.length > 15) {
             showNotification("Username must be between 3 and 15 characters.", "error");
             setIsChangingUsername(false);
@@ -675,7 +672,6 @@ const Profile = ({ user, userData, showNotification }) => {
         }
 
         try {
-            // Check if new username is already taken
             const newUsernameRef = doc(db, "usernames", newUsernameLower);
             const newUsernameDoc = await getDoc(newUsernameRef);
             if (newUsernameDoc.exists()) {
@@ -889,16 +885,32 @@ const CommunityHub = ({ user, userData, setChattingWith, showNotification }) => 
             {count > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">{count}</span>}
         </button>
     );
+    
+    const communitySections = [
+        {name: 'affirmations', label: "Affirmations"},
+        {name: 'friends', label: "Friends"},
+        {name: 'notifications', label: "Notifications", count: userData?.friendRequestsReceived?.length || 0},
+        {name: 'find', label: "Find Friends"}
+    ]
 
     return (
-        <div className="p-2 sm:p-6 max-w-4xl mx-auto">
+        <div className="px-2 sm:px-6 max-w-4xl mx-auto">
             <h2 className="text-3xl font-serif mb-6 text-center text-foreground">Community Hub</h2>
-            <div className="flex justify-center space-x-2 mb-6">
-                <TabButton tabName="affirmations" label="Affirmations" />
-                <TabButton tabName="friends" label="Friends" />
-                <TabButton tabName="notifications" label="Notifications" count={userData?.friendRequestsReceived?.length || 0} />
-                <TabButton tabName="find" label="Find Friends" />
+            
+            <div className="sm:hidden mb-6">
+                <select value={activeTab} onChange={(e) => setActiveTab(e.target.value)} className="w-full bg-input text-foreground p-3 rounded-lg border border-border focus:border-primary">
+                    {communitySections.map(section => (
+                         <option key={section.name} value={section.name}>{section.label} {section.count > 0 ? `(${section.count})` : ''}</option>
+                    ))}
+                </select>
             </div>
+            
+            <div className="hidden sm:flex justify-center space-x-2 mb-6">
+                {communitySections.map(section => (
+                     <TabButton key={section.name} tabName={section.name} label={section.label} count={section.count} />
+                ))}
+            </div>
+            
             <AnimatePresence mode="wait">
                 <motion.div
                     key={activeTab}
@@ -1139,12 +1151,10 @@ const Notifications = ({ user, userData, setNotification }) => {
         const currentUserRef = doc(db, "users", user.uid);
         const senderUserRef = doc(db, "users", senderUid);
 
-        // Remove request from both users' documents
         batch.update(currentUserRef, { friendRequestsReceived: arrayRemove(senderUid) });
         batch.update(senderUserRef, { friendRequestsSent: arrayRemove(user.uid) });
 
         if (accept) {
-            // Add each user to the other's friends list
             batch.update(currentUserRef, { friends: arrayUnion(senderUid) });
             batch.update(senderUserRef, { friends: arrayUnion(user.uid) });
         }
@@ -1234,6 +1244,11 @@ const FindFriends = ({ user, userData, setNotification }) => {
     };
 
     const handleSendRequest = async (targetUid) => {
+        if (!userData) {
+            setNotification("Your user data isn't loaded yet. Please wait.", "error");
+            return;
+        }
+        
         const batch = writeBatch(db);
         const currentUserRef = doc(db, "users", user.uid);
         const targetUserRef = doc(db, "users", targetUid);
