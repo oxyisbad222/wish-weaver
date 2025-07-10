@@ -281,6 +281,90 @@ const Dashboard = ({ navigate, userData }) => {
     );
 };
 
+const Horoscope = ({ zodiac }) => {
+    const [horoscope, setHoroscope] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [timeframe, setTimeframe] = useState('daily');
+
+    const fetchHoroscope = useCallback(async () => {
+        if (!zodiac) return;
+        setLoading(true);
+        setError(null);
+        setHoroscope(null);
+        
+        const url = API_ENDPOINTS.horoscope(zodiac, timeframe);
+
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || "Failed to retrieve horoscope.");
+            }
+            
+            setHoroscope(data.data);
+
+        } catch (err) {
+            console.error(`Error fetching ${timeframe} horoscope:`, err);
+            setError(err.message || `Could not retrieve ${timeframe} horoscope. Please try again later.`);
+        } finally {
+            setLoading(false);
+        }
+    }, [zodiac, timeframe]);
+
+    useEffect(() => {
+        fetchHoroscope();
+    }, [fetchHoroscope]);
+
+    const TimeframeButton = ({ value, label }) => (
+        <button
+            onClick={() => setTimeframe(value)}
+            className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${timeframe === value ? 'bg-primary text-primary-foreground' : 'bg-foreground/10 hover:bg-foreground/20'}`}
+        >
+            {label}
+        </button>
+    );
+    
+    return (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 sm:p-6">
+            <div className="bg-card p-6 rounded-2xl shadow-lg border border-border max-w-3xl mx-auto">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+                    <div>
+                        <h2 className="text-3xl font-serif text-primary capitalize">{timeframe} Horoscope</h2>
+                        <h3 className="text-xl font-semibold text-foreground/80">{zodiac}</h3>
+                    </div>
+                    <div className="flex space-x-2 mt-4 sm:mt-0">
+                       <TimeframeButton value="daily" label="Daily" />
+                       <TimeframeButton value="weekly" label="Weekly" />
+                       <TimeframeButton value="monthly" label="Monthly" />
+                    </div>
+                </div>
+                
+                {loading && (
+                    <div className="space-y-4">
+                        <div className="h-4 bg-foreground/10 rounded w-full animate-pulse"></div>
+                        <div className="h-4 bg-foreground/10 rounded w-5/6 animate-pulse"></div>
+                        <div className="h-4 bg-foreground/10 rounded w-full animate-pulse"></div>
+                    </div>
+                )}
+
+                {error && <ErrorDisplay message={error} />}
+
+                {horoscope && (
+                    <div className="text-lg text-foreground/90 leading-relaxed font-serif space-y-4">
+                        {horoscope.horoscope_data.split('\n').filter(p => p.trim() !== '').map((paragraph, index) => (
+                            <p key={index}>
+                                {paragraph}
+                            </p>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </motion.div>
+    );
+};
+
 const TarotReading = ({ user, fetchUserData }) => {
     const [fullDeck, setFullDeck] = useState([]);
     const [spreadType, setSpreadType] = useState(null);
