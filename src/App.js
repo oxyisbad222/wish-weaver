@@ -257,7 +257,7 @@ const Dashboard = ({ navigate, userData }) => {
     const items = [
         { view: 'horoscope', title: 'Horoscope', desc: 'Daily, weekly, and monthly forecasts.', icon: <Star/> },
         { view: 'tarot', title: 'Tarot Reading', desc: 'Gain insight with a powerful card spread.', icon: <Feather/> },
-        { view: 'past_readings', title: 'Reading Journal', desc: 'Review your saved tarot readings.', guestDisabled: true },
+        { view: 'past_readings', title: 'Reading Journal', desc: 'Review your saved tarot readings.', icon: <BookOpen />, guestDisabled: true },
         { view: 'community', title: 'Community', desc: 'Connect with friends & share affirmations.', icon: <Users/>, guestDisabled: true },
         { view: 'ouija', title: 'Ouija Room', desc: 'Communicate with the other side.', icon: <Sparkles/>, guestDisabled: true },
     ];
@@ -375,6 +375,60 @@ const Horoscope = ({ zodiac }) => {
     );
 };
 
+const CardDisplay = ({ card, positionLabel }) => {
+    const [isFlipped, setIsFlipped] = useState(false);
+
+    return (
+        <div className="flex flex-col items-center text-center">
+            <motion.div 
+              className="relative w-full aspect-[2/3.5] bg-gray-700 rounded-xl overflow-hidden cursor-pointer"
+              whileHover={{ scale: 1.05, y: -5 }}
+              transition={{ type: 'spring', stiffness: 300 }}
+              onClick={() => setIsFlipped(!isFlipped)}
+            >
+               <img
+                    src={`${API_ENDPOINTS.tarotImageBase}${card.img}`}
+                    alt={card.name}
+                    className={`w-full h-full object-cover ${card.isReversed ? 'rotate-180' : ''}`}
+                    onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/200x350/1f2937/9333ea?text=Card+Art'; }}
+                />
+            </motion.div>
+             <div className="mt-2">
+                <p className="font-semibold text-sm sm:text-base text-foreground">{card.name}</p>
+                {positionLabel && <p className="text-xs sm:text-sm text-foreground/60">{positionLabel}</p>}
+             </div>
+        </div>
+    );
+};
+
+const CelticCrossLayout = ({ cards, onCardClick }) => {
+    const positions = [
+        "1. Heart of the Matter", "2. The Obstacle", "3. The Foundation", "4. The Recent Past",
+        "5. The Crown", "6. The Near Future", "7. Your Attitude", "8. External Influences",
+        "9. Hopes and Fears", "10. The Outcome"
+    ];
+
+    return (
+        <div className="w-full max-w-4xl mx-auto p-4 grid grid-cols-4 sm:grid-cols-10 gap-2 sm:gap-4" style={{ gridTemplateRows: 'repeat(4, auto)' }}>
+            {/* The Cross */}
+            <div className="col-start-2 sm:col-start-4 sm:row-start-2"><CardDisplay card={cards[0]} positionLabel={positions[0]} /></div>
+            <div className="col-start-2 sm:col-start-4 sm:row-start-2 -rotate-90"><CardDisplay card={cards[1]} positionLabel={positions[1]} /></div>
+            
+            <div className="col-start-3 sm:col-start-5 sm:row-start-2"><CardDisplay card={cards[4]} positionLabel={positions[4]} /></div>
+            <div className="col-start-1 sm:col-start-3 sm:row-start-2"><CardDisplay card={cards[3]} positionLabel={positions[3]} /></div>
+            <div className="col-start-2 sm:col-start-4 sm:row-start-3"><CardDisplay card={cards[2]} positionLabel={positions[2]} /></div>
+            <div className="col-start-2 sm:col-start-4 sm:row-start-1"><CardDisplay card={cards[5]} positionLabel={positions[5]} /></div>
+
+            {/* The Staff */}
+            <div className="col-start-4 sm:col-start-7 sm:row-start-4"><CardDisplay card={cards[6]} positionLabel={positions[6]} /></div>
+            <div className="col-start-4 sm:col-start-7 sm:row-start-3"><CardDisplay card={cards[7]} positionLabel={positions[7]} /></div>
+            <div className="col-start-4 sm:col-start-7 sm:row-start-2"><CardDisplay card={cards[8]} positionLabel={positions[8]} /></div>
+            <div className="col-start-4 sm:col-start-7 sm:row-start-1"><CardDisplay card={cards[9]} positionLabel={positions[9]} /></div>
+        </div>
+    );
+};
+
+
 const TarotReading = ({ user, showNotification }) => {
     const [fullDeck, setFullDeck] = useState([]);
     const [spreadType, setSpreadType] = useState(null);
@@ -461,26 +515,6 @@ const TarotReading = ({ user, showNotification }) => {
         setIsSaving(true);
     };
 
-    const CardDisplay = ({ card }) => {
-        return (
-            <div className="flex flex-col items-center">
-                <motion.div 
-                  className="relative w-full aspect-[2/3.5] bg-gray-700 rounded-xl overflow-hidden"
-                  whileHover={{ scale: 1.05, y: -5 }}
-                  transition={{ type: 'spring', stiffness: 300 }}
-                >
-                   <img
-                        src={`${API_ENDPOINTS.tarotImageBase}${card.img}`}
-                        alt={card.name}
-                        className={`w-full h-full object-cover ${card.isReversed ? 'rotate-180' : ''}`}
-                        onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/200x350/1f2937/9333ea?text=Card+Art'; }}
-                    />
-                </motion.div>
-                 <button onClick={() => setSelectedCard(card)} className="mt-2 text-sm text-primary hover:underline">View Meaning</button>
-            </div>
-        );
-    };
-
     if (!spreadType) {
         return (
             <div className="text-center max-w-md mx-auto p-4">
@@ -556,15 +590,7 @@ const TarotReading = ({ user, showNotification }) => {
                         </div>
                     )}
                      {spreadType === 'celtic-cross' && cards.length === 10 && (
-                         <div className="grid grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4">
-                            {/* This is a simplified layout for mobile scalability */}
-                            {cards.map((card, i) => (
-                                <div key={card.id} className="flex flex-col items-center">
-                                    <p className="text-xs text-center text-foreground/70 mb-1">{i+1}</p>
-                                    <div className="w-full"><CardDisplay card={card}/></div>
-                                </div>
-                            ))}
-                         </div>
+                         <CelticCrossLayout cards={cards} onCardClick={setSelectedCard} />
                     )}
                 </div>
             )}
@@ -865,7 +891,7 @@ const CommunityHub = ({ user, userData, setChattingWith, showNotification }) => 
     );
 
     return (
-        <div className="p-4 sm:p-6 max-w-4xl mx-auto">
+        <div className="p-2 sm:p-6 max-w-4xl mx-auto">
             <h2 className="text-3xl font-serif mb-6 text-center text-foreground">Community Hub</h2>
             <div className="flex justify-center space-x-2 mb-6">
                 <TabButton tabName="affirmations" label="Affirmations" />
