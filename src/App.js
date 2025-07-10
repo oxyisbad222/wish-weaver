@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, signInAnonymously, deleteUser } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove, collection, query, where, getDocs, writeBatch, serverTimestamp, onSnapshot, orderBy, limit, addDoc, deleteDoc } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove, collection, query, where, getDocs, writeBatch, serverTimestamp, onSnapshot, orderBy, limit, addDoc, deleteDoc, runTransaction } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle, Info, Users, MessageSquare, Sparkles, UserPlus, Send, Check, X } from 'lucide-react';
+import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle, Info, Users, MessageSquare, Sparkles, UserPlus, Send, Check, X, Trash2, Flag } from 'lucide-react';
 import AccountSetup from './AccountSetup';
+import OuijaRoom from './OuijaRoom'; // Import OuijaRoom
 
 const firebaseConfig = {
     apiKey: process.env.REACT_APP_APIKEY,
@@ -489,6 +490,11 @@ const TarotReading = ({ user, fetchUserData }) => {
                             {interpretation.meaning.map((p, i) => <p key={i}>{p}</p>)}
                         </div>
                         <p className="text-md text-foreground/60 mt-4 font-sans">{interpretation.description}</p>
+                        <div className="mt-6 text-center">
+                            <Button onClick={() => setSelectedCard(null)} variant="secondary">
+                                <ArrowLeft className="mr-2 h-4 w-4"/> Back
+                            </Button>
+                        </div>
                     </Modal>
                 )}
                 {isSaving && (
@@ -546,7 +552,6 @@ const TarotReading = ({ user, fetchUserData }) => {
         </div>
     );
 };
-
 
 const Profile = ({ user, userData, fetchUserData, navigate }) => {
     const [preferredName, setPreferredName] = useState(userData?.preferredName || '');
@@ -747,7 +752,7 @@ const CommunityHub = ({ user, userData, fetchUserData, setChattingWith }) => {
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2 }}
                 >
-                    {activeTab === 'affirmations' && <AffirmationWall user={user} userData={userData} />}
+                    {activeTab === 'affirmations' && <AffirmationWall user={user} userData={userData} setNotification={setNotification} />}
                     {activeTab === 'friends' && <FriendsList user={user} userData={userData} fetchUserData={fetchUserData} setNotification={setNotification} setChattingWith={setChattingWith} />}
                     {activeTab === 'find' && <FindFriends user={user} userData={userData} setNotification={setNotification} />}
                 </motion.div>
@@ -756,7 +761,7 @@ const CommunityHub = ({ user, userData, fetchUserData, setChattingWith }) => {
     );
 };
 
-const AffirmationWall = ({ user, userData }) => {
+const AffirmationWall = ({ user, userData, setNotification }) => {
     const [affirmations, setAffirmations] = useState([]);
     const [newAffirmation, setNewAffirmation] = useState('');
     const [isLoading, setIsLoading] = useState(true);
@@ -783,7 +788,8 @@ const AffirmationWall = ({ user, userData }) => {
             authorId: user.uid,
             authorUsername: userData.username,
             authorAvatarSeed: userData.avatarSeed,
-            timestamp: serverTimestamp()
+            timestamp: serverTimestamp(),
+            reports: []
         };
 
         try {
@@ -791,6 +797,49 @@ const AffirmationWall = ({ user, userData }) => {
             setNewAffirmation('');
         } catch (error) {
             console.error("Error posting affirmation: ", error);
+            setNotification("Failed to post affirmation.");
+        }
+    };
+    
+    const handleDeleteAffirmation = async (affirmationId) => {
+        const affirmationRef = doc(db, 'affirmations', affirmationId);
+        try {
+            await deleteDoc(affirmationRef);
+            setNotification("Affirmation deleted.");
+        } catch (error) {
+            console.error("Error deleting affirmation:", error);
+            setNotification("Failed to delete affirmation.");
+        }
+    };
+
+    const handleReportAffirmation = async (affirmationId) => {
+        const affirmationRef = doc(db, 'affirmations', affirmationId);
+        try {
+            await runTransaction(db, async (transaction) => {
+                const affDoc = await transaction.get(affirmationRef);
+                if (!affDoc.exists()) {
+                    throw new Error("Affirmation no longer exists.");
+                }
+
+                const data = affDoc.data();
+                const reports = data.reports || [];
+
+                if (reports.includes(user.uid)) {
+                    setNotification("You have already reported this post.");
+                    return;
+                }
+
+                if (reports.length >= 2) {
+                    transaction.delete(affirmationRef);
+                    setNotification("Post removed due to multiple reports.");
+                } else {
+                    transaction.update(affirmationRef, { reports: arrayUnion(user.uid) });
+                    setNotification("Post reported. Thank you for your feedback.");
+                }
+            });
+        } catch (error) {
+            console.error("Error reporting affirmation:", error);
+            setNotification(error.message || "Failed to report affirmation.");
         }
     };
 
@@ -814,9 +863,16 @@ const AffirmationWall = ({ user, userData }) => {
                 {affirmations.map(aff => (
                     <div key={aff.id} className="bg-background p-4 rounded-lg flex items-start space-x-4">
                         <img src={API_ENDPOINTS.avatar(aff.authorAvatarSeed)} alt="avatar" className="w-10 h-10 rounded-full border-2 border-primary/30" />
-                        <div>
+                        <div className="flex-grow">
                             <p className="font-semibold text-foreground">@{aff.authorUsername}</p>
                             <p className="text-foreground/90">{aff.text}</p>
+                        </div>
+                        <div className="flex-shrink-0">
+                            {user.uid === aff.authorId ? (
+                                <button onClick={() => handleDeleteAffirmation(aff.id)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-full"><Trash2 size={16}/></button>
+                            ) : (
+                                <button onClick={() => handleReportAffirmation(aff.id)} className="p-2 text-foreground/50 hover:bg-foreground/10 rounded-full"><Flag size={16}/></button>
+                            )}
                         </div>
                     </div>
                 ))}
@@ -1119,7 +1175,6 @@ const ChatView = ({ user, friend, onBack }) => {
     );
 };
 
-
 const Footer = ({ navigate, activeView }) => {
     const navItems = [
         { name: 'Home', view: 'dashboard', icon: <Menu /> },
@@ -1209,7 +1264,7 @@ const App = () => {
             case 'profile': return <Profile user={user} userData={userData} fetchUserData={() => {}} navigate={navigate} />;
             case 'past_readings': return <PastReadings readings={userData?.readings || []} />;
             case 'community': return <CommunityHub user={user} userData={userData} fetchUserData={() => {}} setChattingWith={setChattingWith} />;
-            case 'ouija': return <PlaceholderView title="Ouija Room" />;
+            case 'ouija': return <OuijaRoom user={user} userData={userData} onBack={back} />;
             default: return <Dashboard navigate={navigate} userData={userData}/>;
         }
     };
@@ -1236,5 +1291,4 @@ const App = () => {
         </div>
     );
 };
-
 export default App;
