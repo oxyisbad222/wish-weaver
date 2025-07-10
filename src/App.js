@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, signInAnonymously } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove, collection, query, where, getDocs, writeBatch, serverTimestamp, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, signInAnonymously, deleteUser } from 'firebase/auth';
+import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove, collection, query, where, getDocs, writeBatch, serverTimestamp, onSnapshot, orderBy, limit, addDoc, deleteDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle, Info, Users, MessageSquare, Sparkles, UserPlus, Send, Check, X } from 'lucide-react';
 import AccountSetup from './AccountSetup';
@@ -134,6 +134,7 @@ const Button = ({ onClick, children, variant = 'primary', className = '', disabl
     primary: 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 hover:shadow-primary/30',
     secondary: 'bg-transparent border border-primary text-primary hover:bg-primary hover:text-primary-foreground',
     ghost: 'hover:bg-primary/10 text-primary',
+    danger: 'bg-red-600 text-white hover:bg-red-700 shadow-lg shadow-red-600/20',
   };
   return <button onClick={onClick} className={`${baseClasses} ${variants[variant]} ${className}`} disabled={disabled}>{children}</button>;
 };
@@ -554,6 +555,8 @@ const Profile = ({ user, userData, fetchUserData, navigate }) => {
     const [zodiac, setZodiac] = useState(userData?.zodiac || 'Aries');
     const [notification, setNotification] = useState('');
     const [showInfo, setShowInfo] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
 
     const zodiacSigns = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
 
@@ -567,13 +570,38 @@ const Profile = ({ user, userData, fetchUserData, navigate }) => {
         const userDocRef = doc(db, "users", user.uid);
         try {
             await updateDoc(userDocRef, { preferredName, pronouns, avatarSeed, zodiac });
-            if(fetchUserData) await fetchUserData(user.uid);
             setNotification('Profile saved successfully!');
         } catch (error) {
             console.error("Error saving profile:", error);
             setNotification('Failed to save profile.');
         } finally {
             setTimeout(() => setNotification(''), 3000);
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        if (deleteConfirmationText !== 'delete my account') {
+            setNotification("Please type the confirmation phrase correctly.");
+            setTimeout(() => setNotification(''), 3000);
+            return;
+        }
+
+        try {
+            const batch = writeBatch(db);
+            const userDocRef = doc(db, "users", user.uid);
+            const usernameDocRef = doc(db, "usernames", userData.username);
+            
+            batch.delete(userDocRef);
+            batch.delete(usernameDocRef);
+            
+            await batch.commit();
+            await deleteUser(auth.currentUser);
+
+            setNotification('Account deleted successfully.');
+            setShowDeleteModal(false);
+        } catch (error) {
+            console.error("Error deleting account:", error);
+            setNotification(`Failed to delete account. Please log out and log back in to try again. Error: ${error.message}`);
         }
     };
 
@@ -587,6 +615,23 @@ const Profile = ({ user, userData, fetchUserData, navigate }) => {
                         <p className="text-foreground/90 mb-2">Your avatar is generated from a unique "seed" string. Any text can be a seed: your name, a favorite word, or just random characters.</p>
                         <p className="text-foreground/90 mb-4">Changing the seed will create a completely new avatar. The DiceBear 'Notionists' style allows for an almost limitless number of unique combinations, so your avatar can be truly unique!</p>
                         <Button onClick={() => setShowInfo(false)} className="w-full">Got it</Button>
+                    </Modal>
+                )}
+                {showDeleteModal && (
+                    <Modal onClose={() => setShowDeleteModal(false)}>
+                        <h2 className="text-2xl font-serif text-red-500 mb-4">Delete Account</h2>
+                        <p className="text-foreground/90 mb-2">This action is irreversible. All your data, including readings and connections, will be permanently deleted.</p>
+                        <p className="text-foreground/80 mb-4">To confirm, please type "<strong className="text-red-400">delete my account</strong>" in the box below.</p>
+                        <input
+                            type="text"
+                            value={deleteConfirmationText}
+                            onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                            className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none transition-colors mb-4"
+                        />
+                        <div className="flex space-x-4">
+                            <Button onClick={() => setShowDeleteModal(false)} variant="secondary" className="w-full">Cancel</Button>
+                            <Button onClick={handleDeleteAccount} variant="danger" className="w-full" disabled={deleteConfirmationText !== 'delete my account'}>Delete My Account</Button>
+                        </div>
                     </Modal>
                 )}
             </AnimatePresence>
@@ -621,6 +666,7 @@ const Profile = ({ user, userData, fetchUserData, navigate }) => {
             </div>
             
             <Button onClick={handleSave} className="w-full" disabled={user.isAnonymous}>Save Changes</Button>
+            {!user.isAnonymous && <Button onClick={() => setShowDeleteModal(true)} variant="ghost" className="w-full mt-4 text-red-500 hover:bg-red-500/10">Delete Account</Button>}
         </div>
     );
 };
@@ -671,7 +717,7 @@ const PlaceholderView = ({ title }) => (
     </div>
 );
 
-const CommunityHub = ({ user, userData, fetchUserData }) => {
+const CommunityHub = ({ user, userData, fetchUserData, setChattingWith }) => {
     const [activeTab, setActiveTab] = useState('affirmations');
     const [notification, setNotification] = useState('');
 
@@ -702,7 +748,7 @@ const CommunityHub = ({ user, userData, fetchUserData }) => {
                     transition={{ duration: 0.2 }}
                 >
                     {activeTab === 'affirmations' && <AffirmationWall user={user} userData={userData} />}
-                    {activeTab === 'friends' && <FriendsList user={user} userData={userData} fetchUserData={fetchUserData} setNotification={setNotification} />}
+                    {activeTab === 'friends' && <FriendsList user={user} userData={userData} fetchUserData={fetchUserData} setNotification={setNotification} setChattingWith={setChattingWith} />}
                     {activeTab === 'find' && <FindFriends user={user} userData={userData} setNotification={setNotification} />}
                 </motion.div>
             </AnimatePresence>
@@ -741,7 +787,7 @@ const AffirmationWall = ({ user, userData }) => {
         };
 
         try {
-            await setDoc(doc(collection(db, "affirmations")), affirmationData);
+            await addDoc(collection(db, "affirmations"), affirmationData);
             setNewAffirmation('');
         } catch (error) {
             console.error("Error posting affirmation: ", error);
@@ -779,15 +825,15 @@ const AffirmationWall = ({ user, userData }) => {
     );
 };
 
-const FriendsList = ({ user, userData, fetchUserData, setNotification }) => {
+const FriendsList = ({ user, userData, fetchUserData, setNotification, setChattingWith }) => {
     const [friends, setFriends] = useState([]);
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const fetchFriendsAndRequests = useCallback(async () => {
+        if (!userData) return;
         setLoading(true);
         try {
-            // Fetch friends
             if (userData.friends && userData.friends.length > 0) {
                 const friendsQuery = query(collection(db, 'users'), where('uid', 'in', userData.friends));
                 const friendsSnapshot = await getDocs(friendsQuery);
@@ -795,7 +841,6 @@ const FriendsList = ({ user, userData, fetchUserData, setNotification }) => {
             } else {
                 setFriends([]);
             }
-            // Fetch friend requests
             if (userData.friendRequestsReceived && userData.friendRequestsReceived.length > 0) {
                 const requestsQuery = query(collection(db, 'users'), where('uid', 'in', userData.friendRequestsReceived));
                 const requestsSnapshot = await getDocs(requestsQuery);
@@ -812,9 +857,7 @@ const FriendsList = ({ user, userData, fetchUserData, setNotification }) => {
     }, [userData, setNotification]);
 
     useEffect(() => {
-        if (userData) {
-            fetchFriendsAndRequests();
-        }
+        fetchFriendsAndRequests();
     }, [userData, fetchFriendsAndRequests]);
 
     const handleRequest = async (targetUid, accept) => {
@@ -823,8 +866,6 @@ const FriendsList = ({ user, userData, fetchUserData, setNotification }) => {
         const targetUserRef = doc(db, "users", targetUid);
 
         batch.update(currentUserRef, { friendRequestsReceived: arrayRemove(targetUid) });
-        batch.update(targetUserRef, { friendRequestsSent: arrayRemove(user.uid) });
-
         if (accept) {
             batch.update(currentUserRef, { friends: arrayUnion(targetUid) });
             batch.update(targetUserRef, { friends: arrayUnion(user.uid) });
@@ -833,7 +874,6 @@ const FriendsList = ({ user, userData, fetchUserData, setNotification }) => {
         try {
             await batch.commit();
             setNotification(accept ? "Friend added!" : "Request declined.");
-            await fetchUserData(user.uid); // Refresh user data
         } catch (error) {
             console.error("Error handling friend request:", error);
             setNotification("Failed to process request.");
@@ -877,7 +917,11 @@ const FriendsList = ({ user, userData, fetchUserData, setNotification }) => {
                         <h3 className="text-xl font-serif text-primary mb-3">Your Friends</h3>
                         {friends.length > 0 ? (
                             <div className="space-y-2">
-                                {friends.map(friend => <UserCard key={friend.uid} profile={friend} />)}
+                                {friends.map(friend => (
+                                    <UserCard key={friend.uid} profile={friend}>
+                                        <button onClick={() => setChattingWith(friend)} className="p-2 bg-primary/20 text-primary rounded-full hover:bg-primary/40"><MessageSquare size={16}/></button>
+                                    </UserCard>
+                                ))}
                             </div>
                         ) : (
                             <p className="text-foreground/60 text-center py-4">You haven't added any friends yet.</p>
@@ -996,6 +1040,85 @@ const FindFriends = ({ user, userData, setNotification }) => {
     );
 };
 
+const ChatView = ({ user, friend, onBack }) => {
+    const [messages, setMessages] = useState([]);
+    const [newMessage, setNewMessage] = useState('');
+    const messagesEndRef = useRef(null);
+
+    const getChatId = (uid1, uid2) => [uid1, uid2].sort().join('_');
+
+    useEffect(() => {
+        const chatId = getChatId(user.uid, friend.uid);
+        const messagesRef = collection(db, 'chats', chatId, 'messages');
+        const q = query(messagesRef, orderBy('timestamp', 'asc'));
+
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const msgs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setMessages(msgs);
+        });
+
+        return () => unsubscribe();
+    }, [user.uid, friend.uid]);
+
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages]);
+
+    const handleSendMessage = async (e) => {
+        e.preventDefault();
+        if (newMessage.trim() === '') return;
+
+        const chatId = getChatId(user.uid, friend.uid);
+        const messagesRef = collection(db, 'chats', chatId, 'messages');
+
+        await addDoc(messagesRef, {
+            text: newMessage,
+            senderId: user.uid,
+            timestamp: serverTimestamp(),
+        });
+
+        setNewMessage('');
+    };
+
+    return (
+        <div className="p-4 sm:p-6 max-w-4xl mx-auto h-[calc(100vh-150px)] flex flex-col">
+            <div className="flex items-center mb-4">
+                <button onClick={onBack} className="p-2 mr-2 rounded-full hover:bg-foreground/10 transition-colors">
+                    <ArrowLeft className="text-foreground/70" size={20}/>
+                </button>
+                <img src={API_ENDPOINTS.avatar(friend.avatarSeed)} alt="avatar" className="w-10 h-10 rounded-full mr-3" />
+                <div>
+                    <h2 className="text-xl font-bold text-foreground">{friend.preferredName}</h2>
+                    <p className="text-sm text-foreground/60">@{friend.username}</p>
+                </div>
+            </div>
+
+            <div className="flex-grow bg-card border border-border rounded-2xl p-4 overflow-y-auto mb-4 space-y-4">
+                {messages.map(msg => (
+                    <div key={msg.id} className={`flex items-end gap-2 ${msg.senderId === user.uid ? 'justify-end' : 'justify-start'}`}>
+                        {msg.senderId !== user.uid && <img src={API_ENDPOINTS.avatar(friend.avatarSeed)} className="w-6 h-6 rounded-full" alt="friend avatar"/>}
+                        <div className={`max-w-xs md:max-w-md p-3 rounded-2xl ${msg.senderId === user.uid ? 'bg-primary text-primary-foreground rounded-br-none' : 'bg-background rounded-bl-none'}`}>
+                            <p>{msg.text}</p>
+                        </div>
+                    </div>
+                ))}
+                <div ref={messagesEndRef} />
+            </div>
+
+            <form onSubmit={handleSendMessage} className="flex space-x-2">
+                <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type a message..."
+                    className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
+                />
+                <Button type="submit" variant="primary" className="px-4" disabled={!newMessage.trim()}><Send size={18}/></Button>
+            </form>
+        </div>
+    );
+};
+
 
 const Footer = ({ navigate, activeView }) => {
     const navItems = [
@@ -1026,41 +1149,23 @@ const App = () => {
     const [user, setUser] = useState(null);
     const [userData, setUserData] = useState(null);
     const [loadingAuth, setLoadingAuth] = useState(true);
+    const [chattingWith, setChattingWith] = useState(null);
     const { navigate, back, navigateToRoot, currentView, canGoBack, direction } = useNavigation('dashboard');
 
-    const fetchUserData = useCallback(async (uid) => {
-        if (!uid) return;
-        setLoadingAuth(true);
-        try {
-            const userDocRef = doc(db, "users", uid);
-            const unsub = onSnapshot(userDocRef, (doc) => {
-                if (doc.exists()) {
-                    setUserData(doc.data());
-                }
-                setLoadingAuth(false);
-            });
-            // Returning the unsubscribe function to be called on cleanup, though React's flow here makes it tricky
-            // This is more for direct useEffect usage.
-        } catch (error) {
-            console.error("Error fetching user data:", error);
-            setLoadingAuth(false);
-        }
-    }, []);
-
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             setLoadingAuth(true);
             if (currentUser) {
                 setUser(currentUser);
                 if (!currentUser.isAnonymous) {
-                    // Using onSnapshot for real-time updates
                     const userDocRef = doc(db, "users", currentUser.uid);
-                    return onSnapshot(userDocRef, (doc) => {
+                    const unsubSnapshot = onSnapshot(userDocRef, (doc) => {
                         if (doc.exists()) {
                             setUserData(doc.data());
                         }
                         setLoadingAuth(false);
                     });
+                    return () => unsubSnapshot();
                 } else {
                     setUserData({ uid: currentUser.uid, displayName: 'Guest', avatarSeed: 'guest-user-seed', zodiac: 'Aries', readings: [], isAnonymous: true });
                     setLoadingAuth(false);
@@ -1071,14 +1176,12 @@ const App = () => {
                 setLoadingAuth(false);
             }
         });
-        return () => {
-            if (unsubscribe) unsubscribe();
-        };
+        return () => unsubscribe();
     }, []);
-
 
     const handleLogout = async () => {
         await signOut(auth);
+        setChattingWith(null);
         navigateToRoot();
     };
 
@@ -1092,15 +1195,20 @@ const App = () => {
 
     const CurrentView = () => {
         if (user && !user.isAnonymous && userData && userData.needsSetup) {
-            return <AccountSetup user={user} db={db} onSetupComplete={() => fetchUserData(user.uid)} />;
+            return <AccountSetup user={user} db={db} onSetupComplete={() => { /* fetchUserData is now handled by onSnapshot */ }} />;
         }
+        
+        if (chattingWith) {
+            return <ChatView user={user} friend={chattingWith} onBack={() => setChattingWith(null)} />;
+        }
+
         switch (currentView) {
             case 'dashboard': return <Dashboard navigate={navigate} userData={userData}/>;
             case 'horoscope': return <Horoscope zodiac={userData?.zodiac} />;
-            case 'tarot': return <TarotReading user={user} fetchUserData={fetchUserData} />;
-            case 'profile': return <Profile user={user} userData={userData} fetchUserData={fetchUserData} navigate={navigate} />;
+            case 'tarot': return <TarotReading user={user} fetchUserData={() => {}} />;
+            case 'profile': return <Profile user={user} userData={userData} fetchUserData={() => {}} navigate={navigate} />;
             case 'past_readings': return <PastReadings readings={userData?.readings || []} />;
-            case 'community': return <CommunityHub user={user} userData={userData} fetchUserData={fetchUserData} />;
+            case 'community': return <CommunityHub user={user} userData={userData} fetchUserData={() => {}} setChattingWith={setChattingWith} />;
             case 'ouija': return <PlaceholderView title="Ouija Room" />;
             default: return <Dashboard navigate={navigate} userData={userData}/>;
         }
@@ -1116,15 +1224,15 @@ const App = () => {
 
     return (
         <div className="bg-background text-foreground font-sans min-h-screen">
-            {!(userData && userData.needsSetup) && <Header userData={userData} onLogout={handleLogout} onLogoClick={navigateToRoot} onAvatarClick={() => navigate('profile')} onBack={back} canGoBack={canGoBack} />}
+            {!(userData && userData.needsSetup) && !chattingWith && <Header userData={userData} onLogout={handleLogout} onLogoClick={navigateToRoot} onAvatarClick={() => navigate('profile')} onBack={back} canGoBack={canGoBack} />}
             <main className="pb-24 md:pb-4">
                 <AnimatePresence initial={false} mode="wait">
-                    <motion.div key={currentView + (userData?.needsSetup ? 'setup' : '')} initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+                    <motion.div key={currentView + (userData?.needsSetup ? 'setup' : '') + (chattingWith ? chattingWith.uid : '')} initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
                         <CurrentView />
                     </motion.div>
                 </AnimatePresence>
             </main>
-            {!(userData && userData.needsSetup) && <Footer navigate={navigate} activeView={currentView} />}
+            {!(userData && userData.needsSetup) && !chattingWith && <Footer navigate={navigate} activeView={currentView} />}
         </div>
     );
 };
