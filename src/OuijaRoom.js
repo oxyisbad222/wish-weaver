@@ -4,8 +4,6 @@ import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import { ArrowLeft, Send, Check, Copy, Users, Play, Crown } from 'lucide-react';
 import { API_ENDPOINTS } from './App'; 
 
-const db = getFirestore();
-
 // --- Helper Components ---
 
 const Button = ({ onClick, children, variant = 'primary', className = '', disabled = false }) => {
@@ -96,6 +94,9 @@ const OuijaBoard = ({ planchettePosition, setPlanchettePosition, isAnswering, an
 // --- Main OuijaRoom Component ---
 
 const OuijaRoom = ({ user, userData, onBack }) => {
+    // FIX: Initialize Firestore inside the component to ensure Firebase app is ready.
+    const db = getFirestore();
+
     const [roomId, setRoomId] = useState(null);
     const [roomData, setRoomData] = useState(null);
     const [focusMessage, setFocusMessage] = useState('');
@@ -166,7 +167,7 @@ const OuijaRoom = ({ user, userData, onBack }) => {
             }
         });
         return () => unsub();
-    }, [roomId]);
+    }, [roomId, db]); // Added db to dependency array
 
     // --- Game State Logic ---
     const handleStartGame = async () => {
