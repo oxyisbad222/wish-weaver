@@ -1,12 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // --- Firebase & API Configuration ---
-// This section centralizes all external service configurations.
-
 const firebaseConfig = {
     apiKey: process.env.REACT_APP_APIKEY,
     authDomain: process.env.REACT_APP_AUTHDOMAIN,
@@ -25,19 +23,10 @@ const API_ENDPOINTS = {
     horoscope: (sign) => `https://horoscope-app-api.vercel.app/api/v1/get-horoscope/daily?sign=${sign.toLowerCase()}&day=TODAY`,
     tarot: (count) => `https://tarot-api-3hv5.onrender.com/api/v1/cards/random?n=${count}`,
     tarotImage: (imgId) => `https://www.sacred-texts.com/tarot/pkt/img/${imgId}`,
-    avatar: (seed, options = {}) => {
-        const params = new URLSearchParams({
-            seed,
-            backgroundColor: 'b6e3f4,c0aede,d1d4f9',
-            ...options
-        });
-        return `https://api.dicebear.com/8.x/notionists/svg?${params.toString()}`;
-    }
+    avatar: (seed) => `https://api.dicebear.com/8.x/notionists/svg?seed=${seed}&backgroundColor=b6e3f4,c0aede,d1d4f9`
 };
 
 // --- Tarot Logic & Interpretation ---
-// This function provides deeper, more contextual meanings for tarot readings.
-
 const getInsightfulMeaning = (card, position, isReversed) => {
     const baseMeaning = isReversed ? card.meaning_rev : card.meaning_up;
     const positionMeanings = {
@@ -92,7 +81,7 @@ const Notification = ({ message }) => (
                 initial={{ opacity: 0, y: 50 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
-                className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-2 rounded-full shadow-lg z-50"
+                className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-2 rounded-full shadow-lg z-50"
             >
                 {message}
             </motion.div>
@@ -153,7 +142,7 @@ const Login = () => {
                 initial={{ opacity: 0, y: -50 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, type: 'spring' }}
-                className="text-6xl md:text-8xl font-serif mb-4 text-shadow-lg"
+                className="text-6xl md:text-8xl font-serif mb-4"
                 style={{ textShadow: '0 0 15px rgba(192, 132, 252, 0.5)' }}
             >
                 Wish Weaver
@@ -184,7 +173,7 @@ const Header = ({ userData, onLogout }) => (
     <header className="bg-gray-900/50 backdrop-blur-sm p-4 flex justify-between items-center sticky top-0 z-30 border-b border-white/10">
         <h1 className="text-2xl font-bold font-serif text-purple-300">Wish Weaver</h1>
         <div className="flex items-center space-x-4">
-            <img src={API_ENDPOINTS.avatar(userData?.avatarSeed || userData?.displayName)} alt="avatar" className="w-12 h-12 rounded-full border-2 border-purple-400" />
+            <img src={API_ENDPOINTS.avatar(userData?.avatarSeed || userData?.displayName)} alt="avatar" className="w-12 h-12 rounded-full border-2 border-purple-400 bg-purple-200" />
             <button onClick={onLogout} className="bg-purple-600/50 hover:bg-purple-600 border border-purple-500 text-white font-bold py-2 px-4 rounded-full text-sm transition-colors">
                 Logout
             </button>
@@ -227,6 +216,7 @@ const Horoscope = ({ zodiac }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (!zodiac) return;
         const fetchHoroscope = async () => {
             setLoading(true);
             try {
@@ -302,8 +292,8 @@ const TarotReading = ({ user, fetchUserData }) => {
             cards: cards.map((card, i) => {
                 let position;
                 if (spreadType === 'single') position = 'Situation';
-                if (spreadType === 'three-card') position = ['Past', 'Present', 'Future'][i];
-                if (spreadType === 'celtic-cross') position = i + 1;
+                else if (spreadType === 'three-card') position = ['Past', 'Present', 'Future'][i];
+                else if (spreadType === 'celtic-cross') position = i + 1;
                 return {
                     name: card.name,
                     img: card.img,
@@ -330,16 +320,16 @@ const TarotReading = ({ user, fetchUserData }) => {
         } else {
             let position;
             if (spreadType === 'single') position = 'Situation';
-            if (spreadType === 'three-card') position = ['Past', 'Present', 'Future'][index];
-            if (spreadType === 'celtic-cross') position = index + 1;
+            else if (spreadType === 'three-card') position = ['Past', 'Present', 'Future'][index];
+            else if (spreadType === 'celtic-cross') position = index + 1;
             setSelectedCard({ card, position });
         }
     };
 
-    const Card = ({ card, index, position }) => {
+    const Card = ({ card, index }) => {
         const isRevealed = revealed.has(index);
         return (
-            <div className="perspective-1000">
+            <div className="perspective-1000 w-full h-full">
                 <motion.div
                     className="relative w-full h-full cursor-pointer"
                     style={{ transformStyle: 'preserve-3d' }}
@@ -347,13 +337,11 @@ const TarotReading = ({ user, fetchUserData }) => {
                     transition={{ duration: 0.6 }}
                     onClick={() => handleCardClick(card, index)}
                 >
-                    {/* Card Back */}
                     <div className="absolute w-full h-full backface-hidden rounded-xl bg-indigo-500 border-2 border-indigo-300 flex items-center justify-center p-2 shadow-lg">
                         <div className="w-full h-full border-2 border-indigo-300 rounded-md flex items-center justify-center">
                             <svg className="w-1/2 h-1/2 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.293 2.293a1 1 0 010 1.414L10 12l4.293 4.293a1 1 0 010 1.414L12 20M21 12h-9"></path></svg>
                         </div>
                     </div>
-                    {/* Card Front */}
                     <div className="absolute w-full h-full backface-hidden [transform:rotateY(180deg)] rounded-xl shadow-2xl shadow-purple-500/30">
                         <img
                             src={API_ENDPOINTS.tarotImage(card.img)}
@@ -409,7 +397,6 @@ const TarotReading = ({ user, fetchUserData }) => {
             </div>
             {loading ? <LoadingSpinner /> : (
                 <div className="max-w-5xl mx-auto">
-                    {/* RENDER SPREADS */}
                     {spreadType === 'single' && <div className="w-48 h-72 mx-auto"><Card card={cards[0]} index={0} /></div>}
                     {spreadType === 'three-card' && (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-12">
@@ -422,18 +409,19 @@ const TarotReading = ({ user, fetchUserData }) => {
                         </div>
                     )}
                     {spreadType === 'celtic-cross' && cards.length === 10 && (
-                        <div className="grid grid-cols-6 grid-rows-4 gap-2 md:gap-4 items-center justify-center aspect-[4/3]">
-                            <div className="col-start-6 row-span-4 flex flex-col justify-between h-full space-y-2">
-                                {[9, 8, 7, 6].map(i => <div key={cards[i].id} className="w-full h-1/4"><Card card={cards[i]} index={i} /></div>)}
-                            </div>
-                            <div className="col-start-4 row-start-2 row-span-2"><Card card={cards[5]} index={5} /></div>
-                            <div className="col-start-3 row-start-1 col-span-2"><Card card={cards[4]} index={4} /></div>
-                            <div className="col-start-2 row-start-2 row-span-2"><Card card={cards[3]} index={3} /></div>
-                            <div className="col-start-3 row-start-4 col-span-2"><Card card={cards[2]} index={2} /></div>
-                            <div className="col-start-3 row-start-2 col-span-2 row-span-2 relative flex justify-center items-center">
+                        <div className="w-full max-w-xl mx-auto aspect-[3/4] grid grid-cols-4 grid-rows-6 gap-2">
+                             <div className="col-start-1 row-start-3"><Card card={cards[3]} index={3} /></div>
+                             <div className="col-start-2 row-start-4"><Card card={cards[2]} index={2} /></div>
+                             <div className="col-start-2 row-start-2"><Card card={cards[4]} index={4} /></div>
+                             <div className="col-start-3 row-start-3"><Card card={cards[5]} index={5} /></div>
+                             <div className="col-start-2 row-start-3 relative flex items-center justify-center">
                                 <div className="w-full h-full"><Card card={cards[0]} index={0} /></div>
-                                <div className="absolute w-full h-full transform rotate-90 scale-90"><Card card={cards[1]} index={1} /></div>
-                            </div>
+                                <div className="absolute w-full h-full transform rotate-90"><Card card={cards[1]} index={1} /></div>
+                             </div>
+                             <div className="col-start-4 row-start-6"><Card card={cards[6]} index={6} /></div>
+                             <div className="col-start-4 row-start-4"><Card card={cards[7]} index={7} /></div>
+                             <div className="col-start-4 row-start-2"><Card card={cards[8]} index={8} /></div>
+                             <div className="col-start-4 row-start-0"><Card card={cards[9]} index={9} /></div>
                         </div>
                     )}
                 </div>
@@ -613,7 +601,7 @@ const App = () => {
 
     const handleLogout = async () => {
         await signOut(auth);
-        setView('dashboard'); // Reset view on logout
+        setView('dashboard');
     };
 
     const CurrentView = () => {
@@ -641,7 +629,7 @@ const App = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white font-sans">
+        <div className="bg-gray-900 min-h-screen">
             <StarryBackground />
             <Header userData={userData} onLogout={handleLogout} />
             <main className="pb-24">
