@@ -3,7 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, signInAnonymously, deleteUser } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove, collection, query, where, getDocs, writeBatch, serverTimestamp, onSnapshot, orderBy, limit, addDoc, deleteDoc, runTransaction } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle, Info, Users, MessageSquare, Sparkles, UserPlus, Send, Check, X, Trash2, Flag, Bell } from 'lucide-react';
+import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle, Info, Users, MessageSquare, Sparkles, UserPlus, Send, Check, X, Trash2, Flag, Bell, Edit, Save, XCircle } from 'lucide-react';
 import AccountSetup from './AccountSetup';
 import OuijaRoom from './OuijaRoom';
 
@@ -16,6 +16,7 @@ const firebaseConfig = {
     appId: process.env.REACT_APP_APPID
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -158,7 +159,6 @@ const Login = ({ setNotification }) => {
                     createdAt: new Date().toISOString(),
                 });
             }
-            // If user doc already exists, onAuthStateChanged will just log them in.
         } catch (error) {
             console.error("Authentication Error:", error);
             setNotification('Sign up failed. Please try again.', 'error');
@@ -167,17 +167,7 @@ const Login = ({ setNotification }) => {
 
     const handleGoogleSignIn = async () => {
         try {
-            const result = await signInWithPopup(auth, provider);
-            const user = result.user;
-            const userDocRef = doc(db, "users", user.uid);
-            const userDoc = await getDoc(userDocRef);
-
-            if (!userDoc.exists()) {
-                // User tried to sign in but doesn't have an account in our DB.
-                await signOut(auth);
-                setNotification('No account found. Please sign up first.', 'error');
-            }
-            // If user doc exists, onAuthStateChanged will log them in.
+            await signInWithPopup(auth, provider);
         } catch (error) {
             console.error("Authentication Error:", error);
             setNotification('Sign in failed. Please try again.', 'error');
@@ -442,6 +432,7 @@ const TarotReading = ({ user, showNotification }) => {
             title: readingTitle,
             spreadType,
             date: new Date().toISOString(),
+            notes: "", // Add notes field
             cards: cards.map((card, i) => {
                 let position;
                 if (spreadType === 'single') position = 'Situation';
@@ -583,6 +574,9 @@ const Profile = ({ user, userData, showNotification }) => {
     const [showInfo, setShowInfo] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+    const [showUsernameChange, setShowUsernameChange] = useState(false);
+    const [newUsername, setNewUsername] = useState(userData?.username || '');
+    const [isChangingUsername, setIsChangingUsername] = useState(false);
 
     const zodiacSigns = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
 
@@ -626,6 +620,60 @@ const Profile = ({ user, userData, showNotification }) => {
             showNotification(`Failed to delete account. Error: ${error.message}`, 'error');
         }
     };
+    
+    const handleUsernameChange = async () => {
+        setIsChangingUsername(true);
+        const newUsernameLower = newUsername.trim().toLowerCase();
+        
+        // Basic validation
+        if (newUsernameLower.length < 3 || newUsernameLower.length > 15) {
+            showNotification("Username must be between 3 and 15 characters.", "error");
+            setIsChangingUsername(false);
+            return;
+        }
+        if (!/^[a-z0-9_]+$/.test(newUsernameLower)) {
+            showNotification("Username can only contain lowercase letters, numbers, and underscores.", "error");
+            setIsChangingUsername(false);
+            return;
+        }
+        if (newUsernameLower === userData.username) {
+            showNotification("This is already your username.", "error");
+            setIsChangingUsername(false);
+            return;
+        }
+
+        try {
+            // Check if new username is already taken
+            const newUsernameRef = doc(db, "usernames", newUsernameLower);
+            const newUsernameDoc = await getDoc(newUsernameRef);
+            if (newUsernameDoc.exists()) {
+                showNotification("This username is already taken.", "error");
+                setIsChangingUsername(false);
+                return;
+            }
+
+            const batch = writeBatch(db);
+            const oldUsernameRef = doc(db, "usernames", userData.username);
+            const userRef = doc(db, "users", user.uid);
+
+            batch.delete(oldUsernameRef);
+            batch.set(newUsernameRef, { uid: user.uid, username: newUsernameLower });
+            batch.update(userRef, { username: newUsernameLower, usernameLastChanged: serverTimestamp() });
+
+            await batch.commit();
+            showNotification("Username changed successfully!");
+            setShowUsernameChange(false);
+        } catch (error) {
+            console.error("Error changing username:", error);
+            showNotification("Failed to change username.", "error");
+        } finally {
+            setIsChangingUsername(false);
+        }
+    };
+
+    const lastChangedDate = userData.usernameLastChanged?.toDate();
+    const canChangeUsername = !lastChangedDate || (new Date().getTime() - lastChangedDate.getTime()) > 7 * 24 * 60 * 60 * 1000;
+
 
     return (
         <div className="bg-card p-6 rounded-2xl shadow-lg max-w-lg mx-auto border border-border">
@@ -663,7 +711,21 @@ const Profile = ({ user, userData, showNotification }) => {
                 <div className="w-full space-y-4">
                     <div>
                         <label className="text-foreground/80 mb-2 block">Username</label>
-                        <input type="text" value={userData?.isAnonymous ? 'N/A' : `@${userData?.username || ''}`} className="bg-input/50 text-foreground/70 p-3 rounded-lg w-full border border-border" disabled/>
+                        <div className="flex items-center space-x-2">
+                             <input type="text" value={`@${userData?.username || ''}`} className="bg-input/50 text-foreground/70 p-3 rounded-lg w-full border border-border" disabled/>
+                             {!user.isAnonymous && <button onClick={() => setShowUsernameChange(true)} className="p-3 bg-primary/20 text-primary rounded-lg hover:bg-primary/30"><Edit size={18}/></button>}
+                        </div>
+                        {showUsernameChange && (
+                             <div className="mt-2 p-4 bg-background rounded-lg border border-border">
+                                <h4 className="font-semibold mb-2">Change Username</h4>
+                                <input type="text" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary" />
+                                {!canChangeUsername && lastChangedDate && <p className="text-xs text-amber-500 mt-1">You can change your username again on {new Date(lastChangedDate.getTime() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString()}.</p>}
+                                <div className="flex space-x-2 mt-2">
+                                    <Button onClick={handleUsernameChange} className="w-full" disabled={!canChangeUsername || isChangingUsername}>Confirm</Button>
+                                    <Button onClick={() => setShowUsernameChange(false)} variant="ghost" className="w-full">Cancel</Button>
+                                </div>
+                             </div>
+                        )}
                     </div>
                      <div>
                         <label htmlFor="preferredName" className="text-foreground/80 mb-2 block">Preferred Name</label>
@@ -686,39 +748,91 @@ const Profile = ({ user, userData, showNotification }) => {
                 </div>
             </div>
             
-            <Button onClick={handleSave} className="w-full" disabled={user.isAnonymous}>Save Changes</Button>
+            <Button onClick={handleSave} className="w-full" disabled={user.isAnonymous}>Save Profile Changes</Button>
             {!user.isAnonymous && <Button onClick={() => setShowDeleteModal(true)} variant="ghost" className="w-full mt-4 text-red-500 hover:bg-red-500/10">Delete Account</Button>}
         </div>
     );
 };
 
-const PastReadings = ({ readings }) => {
-    const [expanded, setExpanded] = useState(null);
+const PastReadings = ({ user, userData, showNotification }) => {
+    const [expandedReading, setExpandedReading] = useState(null);
+    const [editingNote, setEditingNote] = useState('');
+
+    const handleDeleteReading = async (readingToDelete) => {
+        if (!window.confirm("Are you sure you want to delete this reading? This cannot be undone.")) return;
+        
+        const userDocRef = doc(db, "users", user.uid);
+        const newReadings = userData.readings.filter(r => r.date !== readingToDelete.date);
+        try {
+            await updateDoc(userDocRef, { readings: newReadings });
+            showNotification("Reading deleted.");
+        } catch (error) {
+            console.error("Error deleting reading:", error);
+            showNotification("Failed to delete reading.", "error");
+        }
+    };
+
+    const handleSaveNote = async () => {
+        const userDocRef = doc(db, "users", user.uid);
+        const newReadings = userData.readings.map(r => {
+            if (r.date === expandedReading.date) {
+                return { ...r, notes: editingNote };
+            }
+            return r;
+        });
+        try {
+            await updateDoc(userDocRef, { readings: newReadings });
+            showNotification("Note saved.");
+            setExpandedReading(prev => ({...prev, notes: editingNote}));
+        } catch (error) {
+            console.error("Error saving note:", error);
+            showNotification("Failed to save note.", "error");
+        }
+    };
+
+    const handleExpand = (reading) => {
+        if (expandedReading?.date === reading.date) {
+            setExpandedReading(null);
+            setEditingNote('');
+        } else {
+            setExpandedReading(reading);
+            setEditingNote(reading.notes || '');
+        }
+    };
+
     return (
         <div className="p-4 sm:p-6">
             <h2 className="text-3xl font-serif mb-8 text-foreground text-center">Reading Journal</h2>
             <div className="space-y-4 max-w-4xl mx-auto">
-                {!readings || readings.length === 0 ? (
+                {!userData.readings || userData.readings.length === 0 ? (
                     <p className="text-center text-foreground/60 mt-10">You have no saved readings yet.</p>
                 ) : (
-                    readings.slice().reverse().map((reading, index) => (
+                    userData.readings.slice().reverse().map((reading, index) => (
                         <motion.div key={reading.date} layout className="bg-card p-4 rounded-xl shadow-md border border-border overflow-hidden">
-                            <motion.div layout className="flex justify-between items-center cursor-pointer" onClick={() => setExpanded(expanded === index ? null : index)}>
+                            <motion.div layout className="flex justify-between items-center cursor-pointer" onClick={() => handleExpand(reading)}>
                                 <div>
                                     <h3 className="text-lg font-semibold text-card-foreground capitalize">{reading.title || `${reading.spreadType.replace('-', ' ')} Spread`}</h3>
                                     <span className="text-sm text-card-foreground/60">{new Date(reading.date).toLocaleDateString()}</span>
                                 </div>
-                                <motion.div animate={{ rotate: expanded === index ? 180 : 0 }}><Feather size={16} className="text-card-foreground/60"/></motion.div>
+                                <div className="flex items-center space-x-2">
+                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteReading(reading); }} className="p-2 text-red-500 hover:bg-red-500/10 rounded-full"><Trash2 size={16}/></button>
+                                    <motion.div animate={{ rotate: expandedReading?.date === reading.date ? 180 : 0 }}><Feather size={16} className="text-card-foreground/60"/></motion.div>
+                                </div>
                             </motion.div>
                             <AnimatePresence>
-                                {expanded === index && (
+                                {expandedReading?.date === reading.date && (
                                     <motion.div layout initial={{ opacity: 0, height: 0, marginTop: 0 }} animate={{ opacity: 1, height: 'auto', marginTop: '1rem' }} exit={{ opacity: 0, height: 0, marginTop: 0 }}>
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-4">
                                             {reading.cards.map((cardData, cardIndex) => (
                                                 <div key={cardIndex}>
                                                     <img src={`${API_ENDPOINTS.tarotImageBase}${cardData.img}`} alt={cardData.name} className="rounded-lg shadow-sm" />
                                                 </div>
                                             ))}
+                                        </div>
+                                        <div>
+                                            <h4 className="font-semibold text-card-foreground mb-2">Notes & Reflections</h4>
+                                            <textarea value={editingNote} onChange={(e) => setEditingNote(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary h-24" placeholder="Your thoughts on this reading..."></textarea>
+                                            <Button onClick={handleSaveNote} className="mt-2 w-full sm:w-auto" variant="secondary">Save Note</Button>
                                         </div>
                                     </motion.div>
                                 )}
@@ -987,20 +1101,25 @@ const Notifications = ({ user, userData, setNotification }) => {
         fetchRequests();
     }, [userData, fetchRequests]);
 
-    const handleRequest = async (targetUid, accept) => {
+    const handleRequest = async (senderProfile, accept) => {
+        const senderUid = senderProfile.uid;
         const batch = writeBatch(db);
         const currentUserRef = doc(db, "users", user.uid);
-        const targetUserRef = doc(db, "users", targetUid);
+        const senderUserRef = doc(db, "users", senderUid);
 
-        batch.update(currentUserRef, { friendRequestsReceived: arrayRemove(targetUid) });
+        // Remove request from both users' documents
+        batch.update(currentUserRef, { friendRequestsReceived: arrayRemove(senderUid) });
+        batch.update(senderUserRef, { friendRequestsSent: arrayRemove(user.uid) });
+
         if (accept) {
-            batch.update(currentUserRef, { friends: arrayUnion(targetUid) });
-            batch.update(targetUserRef, { friends: arrayUnion(user.uid) });
+            // Add each user to the other's friends list
+            batch.update(currentUserRef, { friends: arrayUnion(senderUid) });
+            batch.update(senderUserRef, { friends: arrayUnion(user.uid) });
         }
         
         try {
             await batch.commit();
-            setNotification(accept ? "Friend added!" : "Request declined.");
+            setNotification(accept ? `You and @${senderProfile.username} are now friends!` : "Request declined.");
         } catch (error) {
             console.error("Error handling friend request:", error);
             setNotification("Failed to process request.", "error");
@@ -1025,8 +1144,8 @@ const Notifications = ({ user, userData, setNotification }) => {
                                         </div>
                                     </div>
                                     <div className="flex space-x-2">
-                                        <button onClick={() => handleRequest(req.uid, true)} className="p-2 bg-green-500/20 text-green-400 rounded-full hover:bg-green-500/40"><Check size={16}/></button>
-                                        <button onClick={() => handleRequest(req.uid, false)} className="p-2 bg-red-500/20 text-red-400 rounded-full hover:bg-red-500/40"><X size={16}/></button>
+                                        <button onClick={() => handleRequest(req, true)} className="p-2 bg-green-500/20 text-green-400 rounded-full hover:bg-green-500/40"><Check size={16}/></button>
+                                        <button onClick={() => handleRequest(req, false)} className="p-2 bg-red-500/20 text-red-400 rounded-full hover:bg-red-500/40"><X size={16}/></button>
                                     </div>
                                 </div>
                             ))}
@@ -1048,7 +1167,8 @@ const FindFriends = ({ user, userData, setNotification }) => {
 
     const handleSearch = async (e) => {
         e.preventDefault();
-        if (searchUsername.trim() === '' || searchUsername.trim() === userData.username) {
+        const searchTerm = searchUsername.trim().toLowerCase();
+        if (searchTerm === '' || searchTerm === userData.username) {
             setSearchResult(null);
             return;
         }
@@ -1058,7 +1178,7 @@ const FindFriends = ({ user, userData, setNotification }) => {
 
         try {
             const usernamesRef = collection(db, 'usernames');
-            const q = query(usernamesRef, where("username", "==", searchUsername.toLowerCase()));
+            const q = query(usernamesRef, where("username", "==", searchTerm));
             const querySnapshot = await getDocs(q);
 
             if (querySnapshot.empty) {
@@ -1091,7 +1211,7 @@ const FindFriends = ({ user, userData, setNotification }) => {
 
         try {
             await batch.commit();
-            setNotification(`Friend request sent to @${searchUsername}!`);
+            setNotification(`Friend request sent to @${searchResult.username}!`);
             setSearchResult(null);
             setSearchUsername('');
         } catch (error) {
@@ -1341,9 +1461,9 @@ const App = () => {
             case 'horoscope': return <Horoscope zodiac={userData?.zodiac} />;
             case 'tarot': return <TarotReading user={user} showNotification={showNotification} />;
             case 'profile': return <Profile user={user} userData={userData} showNotification={showNotification} />;
-            case 'past_readings': return <PastReadings readings={userData?.readings || []} />;
+            case 'past_readings': return <PastReadings user={user} userData={userData} showNotification={showNotification} />;
             case 'community': return <CommunityHub user={user} userData={userData} setChattingWith={setChattingWith} showNotification={showNotification} />;
-            case 'ouija': return <OuijaRoom user={user} userData={userData} onBack={back} />;
+            case 'ouija': return <OuijaRoom user={user} userData={userData} onBack={back} db={db} />;
             default: return <Dashboard navigate={navigate} userData={userData}/>;
         }
     };
