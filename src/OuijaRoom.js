@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { doc, setDoc, onSnapshot, runTransaction, collection, updateDoc, arrayUnion, arrayRemove, serverTimestamp, addDoc, query, orderBy, limit } from 'firebase/firestore';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useSpring } from 'framer-motion';
 import { Users, LogOut, Send, Crown, Ghost, Sparkles, MessageSquare, Link as LinkIcon } from 'lucide-react';
 import { API_ENDPOINTS } from './App';
 
@@ -81,10 +81,8 @@ const OuijaBoard = ({ room, user, db }) => {
         
         const participantRef = doc(db, 'ouijaRooms', room.id, 'participants', user.uid);
         
-        // Use a lightweight update, `setDoc` with merge is also fine here.
         updateDoc(participantRef, { cursor: { x, y } }).catch(err => {
             // This might fail if the doc doesn't exist yet, which is fine.
-            // A more robust solution might use a try/catch or check existence first.
         });
     }, [db, room, user]);
 
@@ -124,7 +122,6 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
     const [notification, setNotification] = useState({ message: '', type: 'success' });
     const messagesEndRef = useRef(null);
     
-    // Using a fixed room ID for a shared experience.
     const roomId = 'shared_ouija_room_1'; 
 
     const showNotification = useCallback((message, type = 'success') => {
@@ -132,9 +129,7 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
         setTimeout(() => setNotification({ message: '', type: 'success' }), 3000);
     }, []);
 
-    // Subscribe to room, participants, and chat data
     useEffect(() => {
-        // Guard against missing db or user data
         if (!db || !user?.uid || !userData?.username) {
             console.log("DB or user data not ready yet.");
             return;
@@ -144,7 +139,6 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
         const participantsRef = collection(roomRef, 'participants');
         const participantRef = doc(participantsRef, user.uid);
 
-        // Join the room: Create the room if it doesn't exist, and add the user as a participant.
         const joinRoom = async () => {
             try {
                 await runTransaction(db, async (transaction) => {
@@ -189,12 +183,10 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
              setMessages(snapshot.docs.map(d => ({id: d.id, ...d.data()})));
         });
 
-        // Cleanup on unmount
         return () => {
             unsubRoom();
             unsubParticipants();
             unsubMessages();
-            // Remove participant on leave
             runTransaction(db, async (transaction) => {
                  transaction.delete(participantRef);
             }).catch(console.error);
@@ -250,9 +242,7 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
                 )}
             </AnimatePresence>
             <div className="flex-grow flex flex-col lg:flex-row gap-4">
-                {/* Left Panel - Participants & Chat */}
                 <div className="w-full lg:w-80 flex-shrink-0 flex flex-col gap-4">
-                    {/* Participants List */}
                     <div className="bg-card/70 p-4 rounded-xl border border-border backdrop-blur-sm">
                         <h3 className="text-lg font-semibold text-card-foreground mb-3 flex items-center"><Users size={18} className="mr-2"/>Participants ({room.participants?.length || 0})</h3>
                         <div className="space-y-3 max-h-48 overflow-y-auto">
@@ -266,7 +256,6 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
                         </div>
                     </div>
 
-                    {/* Chat Box */}
                     <div className="bg-card/70 p-4 rounded-xl border border-border backdrop-blur-sm flex-grow flex flex-col">
                         <h3 className="text-lg font-semibold text-card-foreground mb-3 flex items-center"><MessageSquare size={18} className="mr-2"/>Chatter</h3>
                         <div className="flex-grow space-y-3 overflow-y-auto mb-3 pr-2">
@@ -288,7 +277,6 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
                     </div>
                 </div>
 
-                {/* Main Content - Ouija Board */}
                 <div className="flex-grow flex flex-col items-center justify-center">
                     <h1 className="text-4xl sm:text-5xl font-serif text-primary text-center mb-2">{room.name}</h1>
                     <p className="text-foreground/60 text-center mb-4">Focus your energy with your friends to reveal a message.</p>
