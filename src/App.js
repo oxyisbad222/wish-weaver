@@ -3,9 +3,9 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, signInAnonymously } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle, Info, Sparkles } from 'lucide-react';
+import AccountSetup from './AccountSetup';
 
-// --- Firebase & API Configuration ---
 const firebaseConfig = {
     apiKey: process.env.REACT_APP_APIKEY,
     authDomain: process.env.REACT_APP_AUTHDOMAIN,
@@ -20,16 +20,12 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
-// --- API ENDPOINTS (Updated tarotImageBase) ---
-const API_ENDPOINTS = {
+export const API_ENDPOINTS = {
     horoscope: (sign, type) => `/api/horoscope?sign=${sign.toLowerCase()}&type=${type}`,
-    // This now points to your local folder in /public/cards/
     tarotImageBase: '/cards/',
     avatar: (seed) => `https://api.dicebear.com/8.x/notionists/svg?seed=${seed}&backgroundColor=f0e7f7,e0f0e9,d1d4f9`
 };
 
-
-// --- Navigation Hook (Unchanged) ---
 const useNavigation = (initialView = 'dashboard') => {
     const [history, setHistory] = useState([initialView]);
     const direction = useRef(1);
@@ -59,25 +55,24 @@ const useNavigation = (initialView = 'dashboard') => {
     return { navigate, back, navigateToRoot, currentView, canGoBack, direction: direction.current };
 };
 
-// --- Tarot Logic to use new JSON structure (Unchanged) ---
 const getInsightfulMeaning = (card, position, isReversed) => {
     const baseMeanings = isReversed ? card.meanings.shadow : card.meanings.light;
     
     const positionMeanings = {
-        1: "The Heart of the Matter: This card represents the core of your situation, the central issue you are facing.",
-        2: "The Obstacle: This card crosses you, representing the immediate challenge or block you must overcome.",
-        3: "The Foundation: This is the basis of the situation, the events and influences from the past that have led you here.",
-        4: "The Recent Past: This card represents events that have just occurred and are still influencing your present.",
-        5: "The Crown/Potential Outcome: This represents the best possible outcome you can achieve, your conscious goal.",
-        6: "The Near Future: This card shows what is likely to happen in the very near future, the next step on your path.",
-        7: "Your Attitude: This reflects your own feelings and perspective on the situation.",
-        8: "External Influences: This card represents the people, energies, or events around you that are affecting the situation.",
-        9: "Hopes and Fears: This reveals your deepest hopes and anxieties concerning the outcome.",
-        10: "The Final Outcome: This card represents the culmination of the situation, the result if you continue on your current path.",
-        'Past': "The Past: This card represents past events and influences that have shaped your current situation.",
-        'Present': "The Present: This card reflects your current circumstances and challenges.",
-        'Future': "The Future: This card offers a glimpse into the potential outcome and direction you are heading.",
-        'Situation': "The Card's Message: This card offers direct insight or advice regarding your current situation."
+        1: "The Heart of the Matter",
+        2: "The Obstacle",
+        3: "The Foundation",
+        4: "The Recent Past",
+        5: "The Crown/Potential",
+        6: "The Near Future",
+        7: "Your Attitude",
+        8: "External Influences",
+        9: "Hopes and Fears",
+        10: "The Final Outcome",
+        'Past': "The Past",
+        'Present': "The Present",
+        'Future': "The Future",
+        'Situation': "The Card's Message"
     };
 
     return {
@@ -88,8 +83,6 @@ const getInsightfulMeaning = (card, position, isReversed) => {
     };
 };
 
-
-// --- UI Components (Unchanged) ---
 const LoadingSpinner = () => (
     <div className="flex justify-center items-center h-screen w-full bg-background">
         <motion.div
@@ -123,7 +116,6 @@ const ErrorDisplay = ({ message }) => (
     </div>
 );
 
-
 const Modal = ({ children, onClose }) => (
     <motion.div
         initial={{ opacity: 0 }}
@@ -155,10 +147,7 @@ const Button = ({ onClick, children, variant = 'primary', className = '', disabl
   return <button onClick={onClick} className={`${baseClasses} ${variants[variant]} ${className}`} disabled={disabled}>{children}</button>;
 };
 
-// --- Page/View Components ---
-
 const Login = () => {
-    // (Logic unchanged)
     const handleGoogleLogin = async () => {
         try {
             const result = await signInWithPopup(auth, provider);
@@ -168,12 +157,11 @@ const Login = () => {
             if (!userDoc.exists()) {
                 await setDoc(userDocRef, {
                     uid: user.uid,
-                    displayName: user.displayName,
                     email: user.email,
                     photoURL: user.photoURL,
-                    avatarSeed: user.displayName,
-                    zodiac: 'Aries',
-                    readings: []
+                    googleDisplayName: user.displayName,
+                    needsSetup: true,
+                    createdAt: new Date().toISOString(),
                 });
             }
         } catch (error) {
@@ -195,15 +183,16 @@ const Login = () => {
                 initial={{ opacity: 0, y: -50 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, type: 'spring' }}
-                className="text-6xl md:text-8xl font-serif mb-4 text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-400"
+                className="text-6xl md:text-8xl font-serif mb-2 text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-400"
             >
                 Wish Weaver
             </motion.h1>
+             <p className="text-md mb-1 text-foreground/50 font-serif">by Skye &lt;3</p>
             <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5, duration: 0.7 }}
-                className="text-xl mb-12 text-foreground/70"
+                className="text-xl mb-12 text-foreground/70 mt-8"
             >
                 Your modern guide to the cosmos.
             </motion.p>
@@ -234,13 +223,14 @@ const Header = ({ userData, onLogout, onLogoClick, onAvatarClick, onBack, canGoB
                     <ArrowLeft className="text-foreground/70" size={20}/>
                 </button>
             )}
-            <h1 onClick={onLogoClick} className="text-xl font-bold font-serif text-primary cursor-pointer">
-                Wish Weaver
-            </h1>
+            <div className="flex flex-col cursor-pointer" onClick={onLogoClick}>
+                <h1 className="text-xl font-bold font-serif text-primary leading-none">Wish Weaver</h1>
+                <p className="text-xs text-foreground/50 font-serif leading-none">by Skye &lt;3</p>
+            </div>
         </div>
         <div className="flex items-center space-x-2 sm:space-x-4">
             <img
-                src={API_ENDPOINTS.avatar(userData?.avatarSeed || userData?.displayName || 'guest')}
+                src={API_ENDPOINTS.avatar(userData?.avatarSeed || 'guest')}
                 alt="avatar"
                 onClick={onAvatarClick}
                 className="w-10 h-10 rounded-full border-2 border-primary/50 cursor-pointer hover:border-primary transition-colors"
@@ -261,7 +251,7 @@ const Dashboard = ({ navigate, userData }) => {
 
     return (
         <div className="p-4 sm:p-6">
-            <h2 className="text-3xl sm:text-4xl font-serif text-center mb-8 text-foreground">Welcome, {userData?.displayName ? userData.displayName.split(' ')[0] : 'Seeker'}</h2>
+            <h2 className="text-3xl sm:text-4xl font-serif text-center mb-8 text-foreground">Welcome, {userData?.preferredName || 'Seeker'}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
                 {items.map((item, i) => (
                     <motion.div
@@ -368,15 +358,15 @@ const Horoscope = ({ zodiac }) => {
     );
 };
 
-
 const TarotReading = ({ user, fetchUserData }) => {
     const [fullDeck, setFullDeck] = useState([]);
     const [spreadType, setSpreadType] = useState(null);
     const [cards, setCards] = useState([]);
-    const [revealed, setRevealed] = useState(new Set());
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selectedCard, setSelectedCard] = useState(null);
+    const [readingTitle, setReadingTitle] = useState("");
+    const [isSaving, setIsSaving] = useState(false);
     const [notification, setNotification] = useState('');
 
     useEffect(() => {
@@ -386,13 +376,14 @@ const TarotReading = ({ user, fetchUserData }) => {
                 const data = await response.json();
                 if (data && data.cards) {
                     setFullDeck(data.cards);
-                } else {
-                    // Adjusted for the provided JSON structure
+                } else if (data && data.root && data.root.cards) {
                     setFullDeck(data.root.cards);
+                } else {
+                    throw new Error("Invalid JSON structure.");
                 }
             } catch (err) {
                 console.error("Error fetching local tarot deck:", err);
-                setError("Could not load the deck of cards. Please ensure tarot-cards.json is in the public folder.");
+                setError("Could not load the deck of cards.");
             } finally {
                 setLoading(false);
             }
@@ -405,39 +396,28 @@ const TarotReading = ({ user, fetchUserData }) => {
             setError("The deck is not available to draw from.");
             return;
         }
-
         setLoading(true);
         setError(null);
         setSpreadType(type);
         setCards([]);
-        setRevealed(new Set());
         setSelectedCard(null);
 
         const shuffled = [...fullDeck].sort(() => 0.5 - Math.random());
-        const drawnCards = shuffled.slice(0, num).map(card => ({
-            ...card,
-            isReversed: Math.random() > 0.5,
-            id: crypto.randomUUID()
-        }));
-
+        const drawnCards = shuffled.slice(0, num).map(card => ({ ...card, isReversed: Math.random() > 0.5, id: crypto.randomUUID() }));
         setCards(drawnCards);
         setLoading(false);
     };
     
     const handleSaveReading = async () => {
-        if (user.isAnonymous) {
-             setNotification('Guests cannot save readings.');
-             setTimeout(() => setNotification(''), 3000);
-             return;
-        }
-        if (revealed.size !== cards.length) {
-            setNotification('Reveal all cards to save.');
+        if (!readingTitle) {
+            setNotification("Please enter a title for your reading.");
             setTimeout(() => setNotification(''), 3000);
             return;
         }
         setNotification('Saving...');
         const userDocRef = doc(db, "users", user.uid);
         const readingToSave = {
+            title: readingTitle,
             spreadType,
             date: new Date().toISOString(),
             cards: cards.map((card, i) => {
@@ -445,18 +425,15 @@ const TarotReading = ({ user, fetchUserData }) => {
                 if (spreadType === 'single') position = 'Situation';
                 else if (spreadType === 'three-card') position = ['Past', 'Present', 'Future'][i];
                 else if (spreadType === 'celtic-cross') position = i + 1;
-                return {
-                    name: card.name,
-                    img: card.img,
-                    isReversed: card.isReversed,
-                    interpretation: getInsightfulMeaning(card, position, card.isReversed)
-                };
+                return { name: card.name, img: card.img, isReversed: card.isReversed, interpretation: getInsightfulMeaning(card, position, card.isReversed) };
             })
         };
         try {
             await updateDoc(userDocRef, { readings: arrayUnion(readingToSave) });
             setNotification("Reading saved successfully!");
             if (fetchUserData) await fetchUserData(user.uid);
+            setIsSaving(false);
+            setReadingTitle("");
         } catch (err) {
             console.error("Error saving reading:", err);
             setNotification("Error: Could not save reading.");
@@ -464,44 +441,28 @@ const TarotReading = ({ user, fetchUserData }) => {
             setTimeout(() => setNotification(''), 3000);
         }
     };
-
-    const handleCardClick = (card, index) => {
-        if (!revealed.has(index)) {
-            setRevealed(prev => new Set(prev).add(index));
-        } else {
-            let position;
-            if (spreadType === 'single') position = 'Situation';
-            else if (spreadType === 'three-card') position = ['Past', 'Present', 'Future'][index];
-            else if (spreadType === 'celtic-cross') position = index + 1;
-            setSelectedCard({ card, position });
+    
+    const openSaveModal = () => {
+        if (user.isAnonymous) {
+            setNotification('Guests cannot save readings.');
+            setTimeout(() => setNotification(''), 3000);
+            return;
         }
+        setIsSaving(true);
     };
 
-    const Card = ({ card, index }) => {
-        const isRevealed = revealed.has(index);
+    const CardDisplay = ({ card }) => {
         return (
-            <div className="perspective-1000 w-full h-full">
-                <motion.div
-                    className="relative w-full h-full cursor-pointer"
-                    style={{ transformStyle: 'preserve-3d' }}
-                    animate={{ rotateY: isRevealed ? 180 : 0 }}
-                    transition={{ duration: 0.6 }}
-                    onClick={() => handleCardClick(card, index)}
-                >
-                    <div className="absolute w-full h-full backface-hidden rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 border-2 border-purple-400/50 flex items-center justify-center p-2 shadow-lg">
-                        <div className="w-full h-full border-2 border-purple-400/50 rounded-md flex items-center justify-center">
-                            <Feather className="w-1/2 h-1/2 text-white/50" />
-                        </div>
-                    </div>
-                    <div className="absolute w-full h-full backface-hidden [transform:rotateY(180deg)] rounded-xl shadow-2xl shadow-glow-primary overflow-hidden">
-                        <img
-                            src={`${API_ENDPOINTS.tarotImageBase}${card.img}`}
-                            alt={card.name}
-                            className={`w-full h-full object-cover rounded-xl ${card.isReversed ? 'rotate-180' : ''}`}
-                            onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/200x350/1f2937/9333ea?text=Card+Art'; }}
-                        />
-                    </div>
-                </motion.div>
+            <div className="flex flex-col items-center">
+                <div className="relative w-full aspect-[2/3.5] bg-gray-700 rounded-xl overflow-hidden">
+                   <img
+                        src={`${API_ENDPOINTS.tarotImageBase}${card.img}`}
+                        alt={card.name}
+                        className={`w-full h-full object-cover ${card.isReversed ? 'rotate-180' : ''}`}
+                        onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/200x350/1f2937/9333ea?text=Card+Art'; }}
+                    />
+                </div>
+                 <button onClick={() => setSelectedCard(card)} className="mt-2 text-sm text-primary hover:underline">View Meaning</button>
             </div>
         );
     };
@@ -513,16 +474,8 @@ const TarotReading = ({ user, fetchUserData }) => {
                 {error && <div className="mb-4"><ErrorDisplay message={error}/></div>}
                 {loading && <div className="flex justify-center"><LoadingSpinner/></div>}
                 <div className="space-y-5">
-                    {[['single', 'Simple Reading (1 Card)', 1], ['three-card', 'Three-Card Spread', 3], ['celtic-cross', 'Celtic Cross', 10]].map(([type, label, count], i) => (
-                        <motion.button
-                            key={type}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: i * 0.15 }}
-                            onClick={() => drawCards(count, type)}
-                            disabled={loading || fullDeck.length === 0}
-                            className="w-full bg-card border border-border p-4 rounded-xl hover:border-primary text-card-foreground font-semibold transition-all hover:bg-foreground/5 disabled:opacity-50"
-                        >
+                    {[['single', 'Simple Reading (1 Card)', 1], ['three-card', 'Three-Card Spread', 3], ['celtic-cross', 'Celtic Cross', 10]].map(([type, label, count]) => (
+                        <motion.button key={type} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.15 }} onClick={() => drawCards(count, type)} disabled={loading || fullDeck.length === 0} className="w-full bg-card border border-border p-4 rounded-xl hover:border-primary text-card-foreground font-semibold transition-all hover:bg-foreground/5 disabled:opacity-50">
                             {label}
                         </motion.button>
                     ))}
@@ -537,17 +490,23 @@ const TarotReading = ({ user, fetchUserData }) => {
             <AnimatePresence>
                 {selectedCard && (
                     <Modal onClose={() => setSelectedCard(null)}>
-                        <h2 className="text-3xl font-serif text-primary mb-2">{selectedCard.card.name} {selectedCard.card.isReversed && '(Reversed)'}</h2>
-                        <p className="text-foreground/70 italic mb-4 font-sans">{getInsightfulMeaning(selectedCard.card, selectedCard.position, selectedCard.card.isReversed).positionContext}</p>
-                        <p className="text-lg text-foreground/90 leading-relaxed font-serif">{getInsightfulMeaning(selectedCard.card, selectedCard.position, selectedCard.card.isReversed).meaning}</p>
-                        <p className="text-md text-foreground/60 mt-4 font-sans">{getInsightfulMeaning(selectedCard.card, selectedCard.position, selectedCard.card.isReversed).description}</p>
+                        <h2 className="text-3xl font-serif text-primary mb-2">{getInsightfulMeaning(selectedCard, null, selectedCard.isReversed).title}</h2>
+                        <p className="text-lg text-foreground/90 leading-relaxed font-serif">{getInsightfulMeaning(selectedCard, null, selectedCard.isReversed).meaning}</p>
+                        <p className="text-md text-foreground/60 mt-4 font-sans">{getInsightfulMeaning(selectedCard, null, selectedCard.isReversed).description}</p>
                     </Modal>
+                )}
+                {isSaving && (
+                     <Modal onClose={() => setIsSaving(false)}>
+                        <h2 className="text-2xl font-serif text-primary mb-4">Save Your Reading</h2>
+                        <input type="text" value={readingTitle} onChange={(e) => setReadingTitle(e.target.value)} placeholder="Enter a title for this reading..." className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors mb-4"/>
+                        <Button onClick={handleSaveReading} className="w-full">Save</Button>
+                     </Modal>
                 )}
             </AnimatePresence>
 
             <div className="flex justify-center mb-6 space-x-4">
                  <Button onClick={() => setSpreadType(null)} variant="secondary">New Spread</Button>
-                 <Button onClick={handleSaveReading} variant="primary" disabled={user.isAnonymous || cards.length === 0}>Save Reading</Button>
+                 <Button onClick={openSaveModal} variant="primary" disabled={user.isAnonymous || cards.length === 0}>Save Reading</Button>
             </div>
             
             {loading && <div className="flex justify-center"><LoadingSpinner/></div>}
@@ -555,32 +514,36 @@ const TarotReading = ({ user, fetchUserData }) => {
 
             {cards && cards.length > 0 && (
                 <div className="max-w-5xl mx-auto">
-                    {spreadType === 'single' && <div className="w-48 h-80 mx-auto"><Card card={cards[0]} index={0} /></div>}
+                    {spreadType === 'single' && <div className="w-48 mx-auto"><CardDisplay card={cards[0]}/></div>}
                     {spreadType === 'three-card' && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-12">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-8">
                             {cards.map((card, i) => (
                                 <div key={card.id}>
                                     <h3 className="text-center text-xl font-serif text-foreground mb-3">{['Past', 'Present', 'Future'][i]}</h3>
-                                    <div className="w-48 h-80 mx-auto"><Card card={card} index={i} /></div>
+                                    <div className="w-48 mx-auto"><CardDisplay card={card}/></div>
                                 </div>
                             ))}
                         </div>
                     )}
                      {spreadType === 'celtic-cross' && cards.length === 10 && (
-                        <div className="w-full max-w-xl mx-auto aspect-[3/4] grid grid-cols-4 grid-rows-6 gap-2">
-                             <div className="col-start-1 row-start-3"><Card card={cards[3]} index={3} /></div>
-                             <div className="col-start-2 row-start-4"><Card card={cards[2]} index={2} /></div>
-                             <div className="col-start-2 row-start-2"><Card card={cards[4]} index={4} /></div>
-                             <div className="col-start-3 row-start-3"><Card card={cards[5]} index={5} /></div>
-                             <div className="col-start-2 row-start-3 relative flex items-center justify-center">
-                                <div className="w-full h-full"><Card card={cards[0]} index={0} /></div>
-                                <div className="absolute w-full h-full transform rotate-90"><Card card={cards[1]} index={1} /></div>
+                         <div className="w-full max-w-sm mx-auto p-2">
+                             <div className="grid grid-cols-3 grid-rows-4 gap-2">
+                                <div className="col-start-2 row-start-1"><CardDisplay card={cards[4]}/></div>
+                                <div className="col-start-1 row-start-2"><CardDisplay card={cards[3]}/></div>
+                                <div className="col-start-2 row-start-2"><CardDisplay card={cards[0]}/></div>
+                                <div className="col-start-3 row-start-2"><CardDisplay card={cards[5]}/></div>
+                                <div className="col-start-2 row-start-3"><CardDisplay card={cards[2]}/></div>
+                                <div className="col-start-2 row-start-4"><CardDisplay card={cards[1]}/></div>
                              </div>
-                             <div className="col-start-4 row-start-6"><Card card={cards[6]} index={6} /></div>
-                             <div className="col-start-4 row-start-4"><Card card={cards[7]} index={7} /></div>
-                             <div className="col-start-4 row-start-2"><Card card={cards[8]} index={8} /></div>
-                             <div className="col-start-4 row-start-0"><Card card={cards[9]} index={9} /></div>
-                        </div>
+                             <div className="mt-4 border-l-2 border-primary/50 pl-4 ml-auto w-1/3">
+                                <div className="space-y-2">
+                                    <CardDisplay card={cards[9]}/>
+                                    <CardDisplay card={cards[8]}/>
+                                    <CardDisplay card={cards[7]}/>
+                                    <CardDisplay card={cards[6]}/>
+                                </div>
+                             </div>
+                         </div>
                     )}
                 </div>
             )}
@@ -590,9 +553,12 @@ const TarotReading = ({ user, fetchUserData }) => {
 
 
 const Profile = ({ user, userData, fetchUserData, navigate }) => {
-    const [avatarSeed, setAvatarSeed] = useState(userData?.avatarSeed || user.displayName);
+    const [preferredName, setPreferredName] = useState(userData?.preferredName || '');
+    const [pronouns, setPronouns] = useState(userData?.pronouns || '');
+    const [avatarSeed, setAvatarSeed] = useState(userData?.avatarSeed || '');
     const [zodiac, setZodiac] = useState(userData?.zodiac || 'Aries');
     const [notification, setNotification] = useState('');
+    const [showInfo, setShowInfo] = useState(false);
 
     const zodiacSigns = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
 
@@ -605,7 +571,7 @@ const Profile = ({ user, userData, fetchUserData, navigate }) => {
         setNotification('Saving...');
         const userDocRef = doc(db, "users", user.uid);
         try {
-            await setDoc(userDocRef, { avatarSeed, zodiac }, { merge: true });
+            await updateDoc(userDocRef, { preferredName, pronouns, avatarSeed, zodiac });
             if(fetchUserData) await fetchUserData(user.uid);
             setNotification('Profile saved successfully!');
         } catch (error) {
@@ -619,39 +585,43 @@ const Profile = ({ user, userData, fetchUserData, navigate }) => {
     return (
         <div className="bg-card p-6 rounded-2xl shadow-lg max-w-lg mx-auto border border-border">
             <Notification message={notification} />
+            <AnimatePresence>
+                {showInfo && (
+                    <Modal onClose={() => setShowInfo(false)}>
+                        <h2 className="text-2xl font-serif text-primary mb-4">About Avatar Seeds</h2>
+                        <p className="text-foreground/90 mb-2">Your avatar is generated from a unique "seed" string. Any text can be a seed: your name, a favorite word, or just random characters.</p>
+                        <p className="text-foreground/90 mb-4">Changing the seed will create a completely new avatar. The DiceBear 'Notionists' style allows for over a quadrillion unique combinations, so your avatar can be truly unique!</p>
+                        <Button onClick={() => setShowInfo(false)} className="w-full">Got it</Button>
+                    </Modal>
+                )}
+            </AnimatePresence>
             <h2 className="text-3xl font-serif mb-6 text-foreground text-center">Profile & Settings</h2>
 
             <div className="flex flex-col items-center mb-6">
                 <img src={API_ENDPOINTS.avatar(avatarSeed)} alt="avatar" className="w-32 h-32 rounded-full border-4 border-primary/40 mb-4" />
-                <label htmlFor="avatarSeed" className="text-foreground/80 mb-2">Avatar Customization</label>
-                <input
-                    id="avatarSeed"
-                    type="text"
-                    value={avatarSeed}
-                    onChange={(e) => setAvatarSeed(e.target.value)}
-                    className="bg-input text-foreground p-3 rounded-lg w-full text-center border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
-                    placeholder="Enter a name or phrase"
-                    disabled={user.isAnonymous}
-                />
+                <div className="w-full space-y-4">
+                     <div>
+                        <label htmlFor="preferredName" className="text-foreground/80 mb-2 block">Preferred Name</label>
+                        <input id="preferredName" type="text" value={preferredName} onChange={(e) => setPreferredName(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors" disabled={user.isAnonymous}/>
+                    </div>
+                     <div>
+                        <label htmlFor="pronouns" className="text-foreground/80 mb-2 block">Pronouns</label>
+                        <input id="pronouns" type="text" value={pronouns} onChange={(e) => setPronouns(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors" disabled={user.isAnonymous}/>
+                    </div>
+                    <div>
+                         <label htmlFor="avatarSeed" className="text-foreground/80 mb-2 flex items-center">Avatar Seed <Info size={14} className="ml-2 cursor-pointer" onClick={() => setShowInfo(true)}/></label>
+                        <input id="avatarSeed" type="text" value={avatarSeed} onChange={(e) => setAvatarSeed(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors" placeholder="Enter anything here" disabled={user.isAnonymous}/>
+                    </div>
+                    <div>
+                         <label htmlFor="zodiac" className="text-foreground/80 mb-2 block">Zodiac Sign</label>
+                        <select id="zodiac" value={zodiac} onChange={(e) => setZodiac(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors appearance-none" disabled={user.isAnonymous}>
+                            {zodiacSigns.map(sign => <option key={sign} value={sign}>{sign}</option>)}
+                        </select>
+                    </div>
+                </div>
             </div>
-
-            <div className="mb-8">
-                <label htmlFor="zodiac" className="text-foreground/80 mb-2 block text-center">Zodiac Sign</label>
-                <select
-                    id="zodiac"
-                    value={zodiac}
-                    onChange={(e) => setZodiac(e.target.value)}
-                    className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors appearance-none text-center"
-                    disabled={user.isAnonymous}
-                >
-                    {zodiacSigns.map(sign => <option key={sign} value={sign}>{sign}</option>)}
-                </select>
-            </div>
-
+            
             <Button onClick={handleSave} className="w-full" disabled={user.isAnonymous}>Save Changes</Button>
-            {!user.isAnonymous &&
-                <Button onClick={() => navigate('past_readings')} variant="ghost" className="w-full mt-2">View Reading Journal</Button>
-            }
         </div>
     );
 };
@@ -668,36 +638,19 @@ const PastReadings = ({ readings }) => {
                     readings.slice().reverse().map((reading, index) => (
                         <motion.div key={reading.date} layout className="bg-card p-4 rounded-xl shadow-md border border-border overflow-hidden">
                             <motion.div layout className="flex justify-between items-center cursor-pointer" onClick={() => setExpanded(expanded === index ? null : index)}>
-                                <h3 className="text-lg font-semibold text-card-foreground capitalize">
-                                    {reading.spreadType.replace('-', ' ')} Spread
-                                </h3>
-                                <div className="flex items-center space-x-4">
-                                  <span className="text-sm text-card-foreground/60">{new Date(reading.date).toLocaleDateString()}</span>
-                                  <motion.div animate={{ rotate: expanded === index ? 90 : 0 }}>
-                                    <Feather size={16} className="text-card-foreground/60"/>
-                                  </motion.div>
+                                <div>
+                                    <h3 className="text-lg font-semibold text-card-foreground capitalize">{reading.title || `${reading.spreadType.replace('-', ' ')} Spread`}</h3>
+                                    <span className="text-sm text-card-foreground/60">{new Date(reading.date).toLocaleDateString()}</span>
                                 </div>
+                                <motion.div animate={{ rotate: expanded === index ? 180 : 0 }}><Feather size={16} className="text-card-foreground/60"/></motion.div>
                             </motion.div>
                             <AnimatePresence>
                                 {expanded === index && (
-                                    <motion.div
-                                        layout
-                                        initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                                        animate={{ opacity: 1, height: 'auto', marginTop: '1rem' }}
-                                        exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                                    >
+                                    <motion.div layout initial={{ opacity: 0, height: 0, marginTop: 0 }} animate={{ opacity: 1, height: 'auto', marginTop: '1rem' }} exit={{ opacity: 0, height: 0, marginTop: 0 }}>
                                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                                             {reading.cards.map((cardData, cardIndex) => (
                                                 <div key={cardIndex}>
-                                                    <img
-                                                        src={`${API_ENDPOINTS.tarotImageBase}${cardData.img}`}
-                                                        alt={cardData.name}
-                                                        className="rounded-lg shadow-sm"
-                                                    />
-                                                    <div className="mt-2 text-xs">
-                                                        <h4 className="font-bold text-card-foreground">{cardData.interpretation.title}</h4>
-                                                        <p className="text-card-foreground/70">{cardData.interpretation.meaning}</p>
-                                                    </div>
+                                                    <img src={`${API_ENDPOINTS.tarotImageBase}${cardData.img}`} alt={cardData.name} className="rounded-lg shadow-sm" />
                                                 </div>
                                             ))}
                                         </div>
@@ -725,19 +678,11 @@ const Footer = ({ navigate, activeView }) => {
         <footer className="fixed bottom-0 left-0 right-0 bg-card/80 backdrop-blur-sm border-t border-border z-30 md:hidden">
             <nav className="flex justify-around p-1">
                 {navItems.map(item => (
-                    <button
-                        key={item.name}
-                        onClick={() => navigate(item.view)}
-                        className={`flex flex-col items-center justify-center w-full py-2 px-1 rounded-lg transition-all duration-300 relative text-sm ${activeView === item.view ? 'text-primary' : 'text-foreground/60 hover:text-primary'}`}
-                    >
+                    <button key={item.name} onClick={() => navigate(item.view)} className={`flex flex-col items-center justify-center w-full py-2 px-1 rounded-lg transition-all duration-300 relative text-sm ${activeView === item.view ? 'text-primary' : 'text-foreground/60 hover:text-primary'}`}>
                         {React.cloneElement(item.icon, { size: 20 })}
                         <span className="text-xs mt-1">{item.name}</span>
                         {activeView === item.view && (
-                            <motion.div
-                                layoutId="active-pill"
-                                className="absolute bottom-0 h-1 w-8 bg-primary rounded-full"
-                                transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-                            ></motion.div>
+                            <motion.div layoutId="active-pill" className="absolute bottom-0 h-1 w-8 bg-primary rounded-full" transition={{ type: 'spring', stiffness: 300, damping: 25 }}></motion.div>
                         )}
                     </button>
                 ))}
@@ -746,8 +691,6 @@ const Footer = ({ navigate, activeView }) => {
     );
 };
 
-
-// --- Main App Component ---
 const App = () => {
     const [user, setUser] = useState(null);
     const [userData, setUserData] = useState(null);
@@ -756,11 +699,13 @@ const App = () => {
 
     const fetchUserData = useCallback(async (uid) => {
         if (!uid) return;
+        setLoadingAuth(true);
         const userDocRef = doc(db, "users", uid);
         const userDoc = await getDoc(userDocRef);
         if (userDoc.exists()) {
             setUserData(userDoc.data());
         }
+        setLoadingAuth(false);
     }, []);
 
     useEffect(() => {
@@ -770,19 +715,14 @@ const App = () => {
                 if (!currentUser.isAnonymous) {
                     await fetchUserData(currentUser.uid);
                 } else {
-                    setUserData({
-                        uid: currentUser.uid,
-                        displayName: 'Guest',
-                        avatarSeed: 'guest-user-seed',
-                        zodiac: 'Aries',
-                        readings: []
-                    })
+                    setUserData({ uid: currentUser.uid, displayName: 'Guest', avatarSeed: 'guest-user-seed', zodiac: 'Aries', readings: [], isAnonymous: true });
+                    setLoadingAuth(false);
                 }
             } else {
                 setUser(null);
                 setUserData(null);
+                setLoadingAuth(false);
             }
-            setLoadingAuth(false);
         });
         return () => unsubscribe();
     }, [fetchUserData]);
@@ -793,27 +733,17 @@ const App = () => {
     };
 
     const pageVariants = {
-        initial: {
-            opacity: 0,
-            x: `${10 * direction}%`
-        },
-        in: {
-            opacity: 1,
-            x: "0%"
-        },
-        out: {
-            opacity: 0,
-            x: `${-10 * direction}%`
-        }
+        initial: { opacity: 0, x: `${10 * direction}%` },
+        in: { opacity: 1, x: "0%" },
+        out: { opacity: 0, x: `${-10 * direction}%` }
     };
 
-    const pageTransition = {
-        type: "tween",
-        ease: "anticipate",
-        duration: 0.4
-    };
+    const pageTransition = { type: "tween", ease: "anticipate", duration: 0.4 };
 
     const CurrentView = () => {
+        if (userData && userData.needsSetup) {
+            return <AccountSetup user={user} onSetupComplete={() => fetchUserData(user.uid)} />;
+        }
         switch (currentView) {
             case 'dashboard': return <Dashboard navigate={navigate} userData={userData}/>;
             case 'horoscope': return <Horoscope zodiac={userData?.zodiac} />;
@@ -834,29 +764,15 @@ const App = () => {
 
     return (
         <div className="bg-background text-foreground font-sans min-h-screen">
-            <Header
-                userData={userData}
-                onLogout={handleLogout}
-                onLogoClick={navigateToRoot}
-                onAvatarClick={() => navigate('profile')}
-                onBack={back}
-                canGoBack={canGoBack}
-            />
+            {!userData?.needsSetup && <Header userData={userData} onLogout={handleLogout} onLogoClick={navigateToRoot} onAvatarClick={() => navigate('profile')} onBack={back} canGoBack={canGoBack} />}
             <main className="pb-24 md:pb-4">
                 <AnimatePresence initial={false} mode="wait">
-                    <motion.div
-                        key={currentView}
-                        initial="initial"
-                        animate="in"
-                        exit="out"
-                        variants={pageVariants}
-                        transition={pageTransition}
-                    >
+                    <motion.div key={currentView + (userData?.needsSetup ? 'setup' : '')} initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
                         <CurrentView />
                     </motion.div>
                 </AnimatePresence>
             </main>
-            <Footer navigate={navigate} activeView={currentView} />
+            {!userData?.needsSetup && <Footer navigate={navigate} activeView={currentView} />}
         </div>
     );
 };
