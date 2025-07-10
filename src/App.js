@@ -3,7 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, signInAnonymously } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sun, Moon, LogOut, User, Star, Menu, X, Key, Feather, BookOpen, Search, ArrowLeft } from 'lucide-react';
+import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle } from 'lucide-react';
 
 // --- Firebase & API Configuration ---
 const firebaseConfig = {
@@ -20,22 +20,22 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
+// --- API ENDPOINTS (NOW POINTING TO OUR PROXY) ---
 const API_ENDPOINTS = {
-    horoscope: (sign, day) => `https://horoscope-app-api.vercel.app/api/v1/get-horoscope/daily?sign=${sign.toLowerCase()}&day=${day}`,
-    horoscopeWeekly: (sign) => `https://horoscope-app-api.vercel.app/api/v1/get-horoscope/weekly?sign=${sign.toLowerCase()}`,
-    horoscopeMonthly: (sign) => `https://horoscope-app-api.vercel.app/api/v1/get-horoscope/monthly?sign=${sign.toLowerCase()}`,
-    tarot: (count) => `https://tarot-api.onrender.com/api/v1/cards/random?n=${count}`,
+    horoscope: (sign, type, day) => `/api/horoscope?sign=${sign.toLowerCase()}&type=${type}&day=${day || 'TODAY'}`,
+    tarot: (count) => `/api/tarot?n=${count}`,
     tarotImage: (imgId) => `https://www.sacred-texts.com/tarot/pkt/img/${imgId}`,
     avatar: (seed) => `https://api.dicebear.com/8.x/notionists/svg?seed=${seed}&backgroundColor=f0e7f7,e0f0e9,d1d4f9`
 };
 
 
-// --- Navigation Hook ---
+// --- Navigation Hook (Unchanged) ---
 const useNavigation = (initialView = 'dashboard') => {
     const [history, setHistory] = useState([initialView]);
-    const direction = useRef(1); // 1 for forward, -1 for back
+    const direction = useRef(1);
 
     const navigate = (newView) => {
+        if (newView === history[history.length - 1]) return; // Prevent navigating to the same view
         direction.current = 1;
         setHistory(prev => [...prev, newView]);
     };
@@ -46,8 +46,9 @@ const useNavigation = (initialView = 'dashboard') => {
             setHistory(prev => prev.slice(0, -1));
         }
     };
-
+    
     const navigateToRoot = () => {
+        if (history.length <= 1) return;
         direction.current = -1;
         setHistory(['dashboard']);
     };
@@ -113,6 +114,15 @@ const Notification = ({ message, type = 'success' }) => (
         )}
     </AnimatePresence>
 );
+
+const ErrorDisplay = ({ message }) => (
+    <div className="flex flex-col items-center justify-center text-center p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+        <AlertTriangle className="text-red-400 w-8 h-8 mb-2" />
+        <p className="text-red-300 font-semibold">An error occurred</p>
+        <p className="text-foreground/70 text-sm">{message}</p>
+    </div>
+);
+
 
 const Modal = ({ children, onClose }) => (
     <motion.div
@@ -218,7 +228,7 @@ const Login = () => {
 
 const Header = ({ userData, onLogout, onLogoClick, onAvatarClick, onBack, canGoBack }) => (
     <header className="bg-card/80 backdrop-blur-sm p-4 flex justify-between items-center sticky top-0 z-40 border-b border-border">
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2 sm:space-x-4">
             {canGoBack && (
                 <button onClick={onBack} className="p-2 rounded-full hover:bg-foreground/10 transition-colors">
                     <ArrowLeft className="text-foreground/70" size={20}/>
@@ -228,7 +238,7 @@ const Header = ({ userData, onLogout, onLogoClick, onAvatarClick, onBack, canGoB
                 Wish Weaver
             </h1>
         </div>
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2 sm:space-x-4">
             <img
                 src={API_ENDPOINTS.avatar(userData?.avatarSeed || userData?.displayName || 'guest')}
                 alt="avatar"
@@ -278,37 +288,30 @@ const Dashboard = ({ navigate, userData }) => {
 const Horoscope = ({ zodiac }) => {
     const [horoscope, setHoroscope] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [timeframe, setTimeframe] = useState('daily'); // 'daily', 'weekly', 'monthly'
 
     const fetchHoroscope = useCallback(async () => {
         if (!zodiac) return;
         setLoading(true);
+        setError(null);
         setHoroscope(null);
-        let url;
-        switch(timeframe) {
-            case 'monthly':
-                url = API_ENDPOINTS.horoscopeMonthly(zodiac);
-                break;
-            case 'weekly':
-                url = API_ENDPOINTS.horoscopeWeekly(zodiac);
-                break;
-            case 'daily':
-            default:
-                 url = API_ENDPOINTS.horoscope(zodiac, 'TODAY');
-                break;
-        }
+        
+        const url = API_ENDPOINTS.horoscope(zodiac, timeframe);
 
         try {
             const response = await fetch(url);
             const data = await response.json();
-            if (data.success) {
-                setHoroscope(data.data);
-            } else {
-                throw new Error("API request was not successful");
+            
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || "Failed to retrieve horoscope.");
             }
-        } catch (error) {
-            console.error(`Error fetching ${timeframe} horoscope:`, error);
-            setHoroscope({ horoscope_data: `Could not retrieve ${timeframe} horoscope. Please try again later.` });
+            
+            setHoroscope(data.data);
+
+        } catch (err) {
+            console.error(`Error fetching ${timeframe} horoscope:`, err);
+            setError(err.message || `Could not retrieve ${timeframe} horoscope. Please try again later.`);
         } finally {
             setLoading(false);
         }
@@ -326,7 +329,7 @@ const Horoscope = ({ zodiac }) => {
             {label}
         </button>
     );
-
+    
     return (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 sm:p-6">
             <div className="bg-card p-6 rounded-2xl shadow-lg border border-border max-w-3xl mx-auto">
@@ -341,15 +344,18 @@ const Horoscope = ({ zodiac }) => {
                        <TimeframeButton value="monthly" label="Monthly" />
                     </div>
                 </div>
-
-                {loading ? (
+                
+                {loading && (
                     <div className="space-y-4">
                         <div className="h-4 bg-foreground/10 rounded w-full animate-pulse"></div>
                         <div className="h-4 bg-foreground/10 rounded w-5/6 animate-pulse"></div>
                         <div className="h-4 bg-foreground/10 rounded w-full animate-pulse"></div>
-                        <div className="h-4 bg-foreground/10 rounded w-4/6 animate-pulse"></div>
                     </div>
-                ) : (
+                )}
+
+                {error && <ErrorDisplay message={error} />}
+
+                {horoscope && (
                     <p className="text-lg text-foreground/90 leading-relaxed font-serif whitespace-pre-line">
                         {horoscope?.horoscope_data}
                     </p>
@@ -360,36 +366,43 @@ const Horoscope = ({ zodiac }) => {
 };
 
 
-// --- TarotReading Component (Unchanged) ---
-const TarotReading = ({ user, fetchUserData, navigate }) => {
-    // (Logic and minor style changes)
+const TarotReading = ({ user, fetchUserData }) => {
     const [spreadType, setSpreadType] = useState(null);
     const [cards, setCards] = useState([]);
     const [revealed, setRevealed] = useState(new Set());
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
     const [selectedCard, setSelectedCard] = useState(null);
     const [notification, setNotification] = useState('');
 
     const drawCards = async (num, type) => {
         setLoading(true);
+        setError(null);
         setSpreadType(type);
         setCards([]);
         setRevealed(new Set());
         setSelectedCard(null);
+
         try {
             const response = await fetch(API_ENDPOINTS.tarot(num));
             const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "Failed to draw cards.");
+            }
+            
             const drawnCards = data.cards.map(card => ({ ...card, isReversed: Math.random() > 0.7, id: crypto.randomUUID() }));
             setCards(drawnCards);
-        } catch (error) {
-            console.error("Error fetching tarot cards:", error);
+
+        } catch (err) {
+            console.error("Error fetching tarot cards:", err);
+            setError(err.message || 'The Tarot API is currently down. Please try again soon.');
         } finally {
             setLoading(false);
         }
     };
-
+    
     const handleSaveReading = async () => {
-        // (Logic unchanged)
         if (user.isAnonymous) {
              setNotification('Guests cannot save readings.');
              setTimeout(() => setNotification(''), 3000);
@@ -421,9 +434,9 @@ const TarotReading = ({ user, fetchUserData, navigate }) => {
         try {
             await updateDoc(userDocRef, { readings: arrayUnion(readingToSave) });
             setNotification("Reading saved successfully!");
-            await fetchUserData(user.uid);
-        } catch (error) {
-            console.error("Error saving reading:", error);
+            if (fetchUserData) await fetchUserData(user.uid);
+        } catch (err) {
+            console.error("Error saving reading:", err);
             setNotification("Error: Could not save reading.");
         } finally {
             setTimeout(() => setNotification(''), 3000);
@@ -475,6 +488,7 @@ const TarotReading = ({ user, fetchUserData, navigate }) => {
         return (
             <div className="text-center max-w-md mx-auto p-4">
                 <h2 className="text-3xl font-serif mb-8 text-foreground">Choose a Tarot Spread</h2>
+                {error && <div className="mb-4"><ErrorDisplay message={error}/></div>}
                 <div className="space-y-5">
                     {[['single', 'Simple Reading (1 Card)', 1], ['three-card', 'Three-Card Spread', 3], ['celtic-cross', 'Celtic Cross', 10]].map(([type, label, count], i) => (
                         <motion.button
@@ -483,16 +497,17 @@ const TarotReading = ({ user, fetchUserData, navigate }) => {
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: i * 0.15 }}
                             onClick={() => drawCards(count, type)}
-                            className="w-full bg-card border border-border p-4 rounded-xl hover:border-primary text-card-foreground font-semibold transition-all hover:bg-foreground/5"
+                            disabled={loading}
+                            className="w-full bg-card border border-border p-4 rounded-xl hover:border-primary text-card-foreground font-semibold transition-all hover:bg-foreground/5 disabled:opacity-50"
                         >
-                            {label}
+                            {loading ? "Drawing..." : label}
                         </motion.button>
                     ))}
                 </div>
             </div>
         );
     }
-
+    
     return (
         <div className="p-4">
             <Notification message={notification} />
@@ -509,9 +524,13 @@ const TarotReading = ({ user, fetchUserData, navigate }) => {
 
             <div className="flex justify-center mb-6 space-x-4">
                  <Button onClick={() => setSpreadType(null)} variant="secondary">New Spread</Button>
-                 <Button onClick={handleSaveReading} variant="primary" disabled={user.isAnonymous}>Save Reading</Button>
+                 <Button onClick={handleSaveReading} variant="primary" disabled={user.isAnonymous || cards.length === 0}>Save Reading</Button>
             </div>
-            {loading ? <LoadingSpinner /> : (
+            
+            {loading && <div className="flex justify-center"><LoadingSpinner/></div>}
+            {error && <div className="max-w-md mx-auto"><ErrorDisplay message={error}/></div>}
+
+            {cards && cards.length > 0 && (
                 <div className="max-w-5xl mx-auto">
                     {spreadType === 'single' && <div className="w-48 h-80 mx-auto"><Card card={cards[0]} index={0} /></div>}
                     {spreadType === 'three-card' && (
@@ -547,7 +566,6 @@ const TarotReading = ({ user, fetchUserData, navigate }) => {
 };
 
 
-// --- Profile and PastReadings Components (Unchanged) ---
 const Profile = ({ user, userData, fetchUserData, navigate }) => {
     const [avatarSeed, setAvatarSeed] = useState(userData?.avatarSeed || user.displayName);
     const [zodiac, setZodiac] = useState(userData?.zodiac || 'Aries');
@@ -565,7 +583,7 @@ const Profile = ({ user, userData, fetchUserData, navigate }) => {
         const userDocRef = doc(db, "users", user.uid);
         try {
             await setDoc(userDocRef, { avatarSeed, zodiac }, { merge: true });
-            await fetchUserData(user.uid);
+            if(fetchUserData) await fetchUserData(user.uid);
             setNotification('Profile saved successfully!');
         } catch (error) {
             console.error("Error saving profile:", error);
@@ -621,7 +639,7 @@ const PastReadings = ({ readings }) => {
         <div className="p-4 sm:p-6">
             <h2 className="text-3xl font-serif mb-8 text-foreground text-center">Reading Journal</h2>
             <div className="space-y-4 max-w-4xl mx-auto">
-                {readings.length === 0 ? (
+                {!readings || readings.length === 0 ? (
                     <p className="text-center text-foreground/60 mt-10">You have no saved readings yet.</p>
                 ) : (
                     readings.slice().reverse().map((reading, index) => (
@@ -671,7 +689,7 @@ const PastReadings = ({ readings }) => {
     );
 };
 
-// --- Footer Component ---
+
 const Footer = ({ navigate, activeView }) => {
     const navItems = [
         { name: 'Home', view: 'dashboard', icon: <Menu /> },
@@ -776,7 +794,7 @@ const App = () => {
         switch (currentView) {
             case 'dashboard': return <Dashboard navigate={navigate} userData={userData}/>;
             case 'horoscope': return <Horoscope zodiac={userData?.zodiac} />;
-            case 'tarot': return <TarotReading user={user} fetchUserData={fetchUserData} navigate={navigate} />;
+            case 'tarot': return <TarotReading user={user} fetchUserData={fetchUserData} />;
             case 'profile': return <Profile user={user} userData={userData} fetchUserData={fetchUserData} navigate={navigate} />;
             case 'past_readings': return <PastReadings readings={userData?.readings || []} />;
             default: return <Dashboard navigate={navigate} userData={userData}/>;
