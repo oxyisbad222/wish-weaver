@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove, collection, query, where, onSnapshot, addDoc, serverTimestamp, deleteDoc, runTransaction } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove, collection, query, where, onSnapshot, addDoc, serverTimestamp, deleteDoc, runTransaction } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, Lock, Plus, LogOut, Send, Paperclip, Crown, Ghost, Vote, MessageCircle } from 'lucide-react';
 import { API_ENDPOINTS } from './App'; // Assuming App.js exports this
 
-const db = getFirestore();
+// Note: The 'db' instance is now passed in as a prop to components that need it.
 
-const OuijaBoard = ({ room, user }) => {
+const OuijaBoard = ({ room, user, db }) => {
     const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890.,'?!&@#$*()+-=/:;".split('');
     const planchetteRef = useRef(null);
     const boardRef = useRef(null);
@@ -36,10 +36,6 @@ const OuijaBoard = ({ room, user }) => {
             const x = clientX - boardRect.left;
             const y = clientY - boardRect.top;
             
-            // To make it feel more collaborative, we don't directly set the position.
-            // Instead, we send an "intent" to move, and the backend averages it out or decides.
-            // For this implementation, we'll let the user's movement guide it locally
-            // while the backend determines the "true" target.
             if (planchetteRef.current) {
                  planchetteRef.current.style.transform = `translate(${x - 30}px, ${y - 40}px)`;
             }
@@ -93,7 +89,7 @@ const OuijaBoard = ({ room, user }) => {
             return () => clearTimeout(timeoutId);
         }
 
-    }, [room.gamePhase, room.guidingMessage, room.guidingMessageIndex, room.host.uid, user.uid, room.id]);
+    }, [room.gamePhase, room.guidingMessage, room.guidingMessageIndex, room.host.uid, user.uid, room.id, db]);
 
 
     return (
@@ -131,11 +127,12 @@ const OuijaBoard = ({ room, user }) => {
     );
 };
 
-const RoomLobby = ({ onJoinRoom }) => {
+const RoomLobby = ({ onJoinRoom, db }) => {
     const [rooms, setRooms] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        if (!db) return;
         const q = query(collection(db, 'ouijaRooms'), where('isPublic', '==', true));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const roomsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -143,7 +140,7 @@ const RoomLobby = ({ onJoinRoom }) => {
             setIsLoading(false);
         });
         return () => unsubscribe();
-    }, []);
+    }, [db]);
 
     return (
         <div className="bg-card p-4 rounded-xl border border-border">
@@ -227,12 +224,12 @@ const CreateRoomModal = ({ onClose, onCreate }) => {
     );
 };
 
-const FocusPhase = ({ user, room, setNotification }) => {
+const FocusPhase = ({ user, room, setNotification, db }) => {
     const [message, setMessage] = useState('');
     const hasSubmitted = room.focusMessages?.some(m => m.uid === user.uid);
 
     const handleSubmit = async () => {
-        if (!message.trim() || hasSubmitted) return;
+        if (!message.trim() || hasSubmitted || !db) return;
         const roomRef = doc(db, 'ouijaRooms', room.id);
         try {
             await updateDoc(roomRef, {
@@ -273,12 +270,12 @@ const FocusPhase = ({ user, room, setNotification }) => {
     );
 };
 
-const VotingPhase = ({ user, room, setNotification }) => {
+const VotingPhase = ({ user, room, setNotification, db }) => {
     const hasVoted = Object.values(room.votes || {}).flat().includes(user.uid);
 
     const handleVote = async (messageId) => {
-        if (hasVoted) {
-            setNotification("You have already voted.", "error");
+        if (hasVoted || !db) {
+            if(hasVoted) setNotification("You have already voted.", "error");
             return;
         }
         const roomRef = doc(db, 'ouijaRooms', room.id);
@@ -319,7 +316,7 @@ const VotingPhase = ({ user, room, setNotification }) => {
 };
 
 
-const OuijaRoom = ({ user, userData, onBack }) => {
+const OuijaRoom = ({ user, userData, onBack, db }) => {
     const [currentRoomId, setCurrentRoomId] = useState(null);
     const [currentRoom, setCurrentRoom] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -332,7 +329,7 @@ const OuijaRoom = ({ user, userData, onBack }) => {
     };
     
     useEffect(() => {
-        if (!currentRoomId) return;
+        if (!currentRoomId || !db) return;
         
         setIsLoading(true);
         const roomRef = doc(db, 'ouijaRooms', currentRoomId);
@@ -354,11 +351,11 @@ const OuijaRoom = ({ user, userData, onBack }) => {
         });
 
         return () => unsubscribe();
-    }, [currentRoomId, user.uid, userData.username, userData.avatarSeed]);
+    }, [currentRoomId, user.uid, userData.username, userData.avatarSeed, db]);
 
     // Host-specific logic to manage game phases
     useEffect(() => {
-        if (!currentRoom || currentRoom.host.uid !== user.uid) return;
+        if (!currentRoom || currentRoom.host.uid !== user.uid || !db) return;
 
         const roomRef = doc(db, 'ouijaRooms', currentRoom.id);
         const participantsCount = currentRoom.participants?.length || 0;
@@ -371,7 +368,7 @@ const OuijaRoom = ({ user, userData, onBack }) => {
         // Start session when all participants have voted
         if (currentRoom.gamePhase === 'voting') {
             const totalVotes = Object.values(currentRoom.votes || {}).flat().length;
-            if (totalVotes === participantsCount) {
+            if (totalVotes === participantsCount && participantsCount > 0) {
                  const winningMessageId = Object.entries(currentRoom.votes).sort((a, b) => b[1].length - a[1].length)[0][0];
                  const winningMessage = currentRoom.focusMessages.find(m => m.id === winningMessageId)?.message;
                  if (winningMessage) {
@@ -382,10 +379,11 @@ const OuijaRoom = ({ user, userData, onBack }) => {
             }
         }
 
-    }, [currentRoom, user.uid]);
+    }, [currentRoom, user.uid, db]);
 
 
     const handleCreateRoom = async (name, isPublic) => {
+        if (!db) return;
         const newRoomRef = doc(collection(db, 'ouijaRooms'));
         const roomData = {
             id: newRoomRef.id, name, isPublic,
@@ -410,7 +408,7 @@ const OuijaRoom = ({ user, userData, onBack }) => {
     };
 
     const handleLeaveRoom = async () => {
-        if (!currentRoomId) return;
+        if (!currentRoomId || !db) return;
         const roomRef = doc(db, 'ouijaRooms', currentRoomId);
         
         try {
@@ -438,7 +436,7 @@ const OuijaRoom = ({ user, userData, onBack }) => {
     };
     
     const startFocusPhase = async () => {
-        if (currentRoom.host.uid !== user.uid) return;
+        if (currentRoom.host.uid !== user.uid || !db) return;
         const roomRef = doc(db, 'ouijaRooms', currentRoom.id);
         await updateDoc(roomRef, { gamePhase: 'focus', currentMessage: '', focusMessages: [], votes: {} });
     };
@@ -446,15 +444,15 @@ const OuijaRoom = ({ user, userData, onBack }) => {
     const renderGamePhaseContent = () => {
         switch (currentRoom.gamePhase) {
             case 'focus':
-                return <FocusPhase user={user} room={currentRoom} setNotification={showNotification} />;
+                return <FocusPhase user={user} room={currentRoom} setNotification={showNotification} db={db} />;
             case 'voting':
-                return <VotingPhase user={user} room={currentRoom} setNotification={showNotification} />;
+                return <VotingPhase user={user} room={currentRoom} setNotification={showNotification} db={db} />;
             case 'session':
             case 'idle':
             default:
                 return (
                     <div className="text-center">
-                        <OuijaBoard room={currentRoom} user={user} userData={userData} />
+                        <OuijaBoard room={currentRoom} user={user} userData={userData} db={db} />
                         {currentRoom.host.uid === user.uid && currentRoom.gamePhase === 'idle' && (
                             <button onClick={startFocusPhase} className="mt-6 bg-primary text-primary-foreground font-semibold py-3 px-6 rounded-lg hover:bg-primary/90 transition-colors">
                                 Ask a New Question
@@ -482,7 +480,7 @@ const OuijaRoom = ({ user, userData, onBack }) => {
                         <span>Create Room</span>
                     </button>
                 </div>
-                <RoomLobby onJoinRoom={handleJoinRoom} />
+                <RoomLobby onJoinRoom={handleJoinRoom} db={db} />
             </div>
         );
     }
