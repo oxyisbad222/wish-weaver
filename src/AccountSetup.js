@@ -31,6 +31,7 @@ const AccountSetup = ({ user, db, onSetupComplete }) => {
     const [preferredName, setPreferredName] = useState('');
     const [pronouns, setPronouns] = useState('');
     const [zodiac, setZodiac] = useState('Aries');
+    const [bio, setBio] = useState('');
     const [avatarSeed, setAvatarSeed] = useState(user.uid);
     const [avatarStyle] = useState('notionists');
     const [error, setError] = useState('');
@@ -107,8 +108,13 @@ const AccountSetup = ({ user, db, onSetupComplete }) => {
                 preferredName,
                 pronouns,
                 zodiac,
+                bio,
                 avatarSeed,
                 avatarStyle,
+                isNamePublic: true,
+                isPronounsPublic: true,
+                isZodiacPublic: true,
+                isBioPublic: true,
                 friends: [],
                 friendRequestsSent: [],
                 friendRequestsReceived: [],
@@ -158,6 +164,10 @@ const AccountSetup = ({ user, db, onSetupComplete }) => {
                             <div>
                                 <label htmlFor="pronouns" className="text-foreground/80 mb-1 block text-sm">Pronouns</label>
                                 <input id="pronouns" type="text" value={pronouns} onChange={(e) => setPronouns(e.target.value)} placeholder="e.g., she/her, they/them" className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"/>
+                            </div>
+                             <div>
+                                <label htmlFor="bio" className="text-foreground/80 mb-1 block text-sm">Bio</label>
+                                <textarea id="bio" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="A little about yourself..." className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary h-24" maxLength={150}></textarea>
                             </div>
                             <div>
                                 <label htmlFor="zodiac" className="text-foreground/80 mb-1 block text-sm">Zodiac Sign</label>

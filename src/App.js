@@ -3,7 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, signInAnonymously, deleteUser } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove, collection, query, where, getDocs, writeBatch, serverTimestamp, onSnapshot, orderBy, limit, addDoc, deleteDoc, runTransaction } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle, Info, Users, MessageSquare, Sparkles, UserPlus, Send, Check, X, Trash2, Flag, Bell, Edit, Save, XCircle, ChevronDown } from 'lucide-react';
+import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle, Info, Users, MessageSquare, Sparkles, UserPlus, Send, Check, X, Trash2, Flag, Bell, Edit, Save, XCircle } from 'lucide-react';
 import AccountSetup from './AccountSetup';
 import OuijaRoom from './OuijaRoom';
 
@@ -431,6 +431,7 @@ const TarotReading = ({ user, showNotification }) => {
     const [selectedCard, setSelectedCard] = useState(null);
     const [readingTitle, setReadingTitle] = useState("");
     const [isSaving, setIsSaving] = useState(false);
+    const [showInfoModal, setShowInfoModal] = useState(false);
 
     useEffect(() => {
         const fetchDeck = async () => {
@@ -559,6 +560,23 @@ const TarotReading = ({ user, showNotification }) => {
                         <Button onClick={handleSaveReading} className="w-full">Save</Button>
                      </Modal>
                 )}
+                {showInfoModal && (
+                    <Modal onClose={() => setShowInfoModal(false)}>
+                        <h2 className="text-2xl font-serif text-primary mb-4">How to Read the Celtic Cross</h2>
+                        <div className="space-y-2 text-foreground/90 text-sm">
+                            <p><strong>1. The Heart of the Matter:</strong> Represents the core of the situation.</p>
+                            <p><strong>2. The Obstacle:</strong> The immediate challenge or conflict.</p>
+                            <p><strong>3. The Foundation:</strong> The subconscious influences and past events.</p>
+                            <p><strong>4. The Recent Past:</strong> Events that have just occurred.</p>
+                            <p><strong>5. The Crown:</strong> The best possible outcome or potential.</p>
+                            <p><strong>6. The Near Future:</strong> What is likely to happen next.</p>
+                            <p><strong>7. Your Attitude:</strong> Your own feelings and perspective.</p>
+                            <p><strong>8. External Influences:</strong> The people and environment around you.</p>
+                            <p><strong>9. Hopes and Fears:</strong> Your deepest desires and anxieties.</p>
+                            <p><strong>10. The Final Outcome:</strong> The likely result if things continue on their current path.</p>
+                        </div>
+                    </Modal>
+                )}
             </AnimatePresence>
 
             <div className="flex justify-center mb-6 space-x-4">
@@ -571,6 +589,14 @@ const TarotReading = ({ user, showNotification }) => {
 
             {cards && cards.length > 0 && (
                 <div className="max-w-5xl mx-auto">
+                    {spreadType === 'celtic-cross' && (
+                        <div className="flex justify-center items-center mb-4">
+                            <button onClick={() => setShowInfoModal(true)} className="flex items-center space-x-2 text-sm text-primary hover:underline">
+                                <Info size={16}/>
+                                <span>How to Read the Spread</span>
+                            </button>
+                        </div>
+                    )}
                     {spreadType === 'single' && <div className="w-40 sm:w-48 mx-auto"><CardDisplay card={cards[0]} onCardClick={setSelectedCard}/></div>}
                     {spreadType === 'three-card' && (
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-8">
@@ -595,9 +621,14 @@ const TarotReading = ({ user, showNotification }) => {
 const Profile = ({ user, userData, showNotification }) => {
     const [preferredName, setPreferredName] = useState(userData?.preferredName || '');
     const [pronouns, setPronouns] = useState(userData?.pronouns || '');
+    const [bio, setBio] = useState(userData?.bio || '');
     const [avatarSeed, setAvatarSeed] = useState(userData?.avatarSeed || '');
     const [avatarStyle, setAvatarStyle] = useState(userData?.avatarStyle || 'notionists');
     const [zodiac, setZodiac] = useState(userData?.zodiac || 'Aries');
+    const [isNamePublic, setIsNamePublic] = useState(userData?.isNamePublic ?? true);
+    const [isPronounsPublic, setIsPronounsPublic] = useState(userData?.isPronounsPublic ?? true);
+    const [isBioPublic, setIsBioPublic] = useState(userData?.isBioPublic ?? true);
+    const [isZodiacPublic, setIsZodiacPublic] = useState(userData?.isZodiacPublic ?? true);
     const [showInfo, setShowInfo] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
@@ -616,7 +647,18 @@ const Profile = ({ user, userData, showNotification }) => {
         showNotification('Saving...');
         const userDocRef = doc(db, "users", user.uid);
         try {
-            await updateDoc(userDocRef, { preferredName, pronouns, avatarSeed, avatarStyle, zodiac });
+            await updateDoc(userDocRef, { 
+                preferredName, 
+                pronouns, 
+                bio,
+                avatarSeed, 
+                avatarStyle, 
+                zodiac,
+                isNamePublic,
+                isPronounsPublic,
+                isBioPublic,
+                isZodiacPublic
+            });
             showNotification('Profile saved successfully!');
         } catch (error) {
             console.error("Error saving profile:", error);
@@ -1088,7 +1130,7 @@ const FriendsList = ({ user, userData, setNotification, setChattingWith }) => {
     useEffect(() => {
         fetchFriendsAndRequests();
     }, [userData, fetchFriendsAndRequests]);
-
+    
     const handleRemoveFriend = async (friendUid) => {
         if (!window.confirm("Are you sure you want to remove this friend?")) return;
         
