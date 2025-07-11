@@ -361,16 +361,39 @@ const Horoscope = ({ zodiac }) => {
                 {error && <ErrorDisplay message={error} />}
 
                 {horoscope && (
-                    <div className="text-base sm:text-lg text-foreground/90 leading-relaxed font-serif space-y-4">
-                        {horoscope.horoscope_data.split('\n').filter(p => p.trim() !== '').map((paragraph, index) => (
-                            <p key={index} className="mb-4" style={{textIndent: '2em'}}>
-                                {paragraph}
+                    <div className="text-base sm:text-lg text-foreground/90 leading-relaxed font-serif">
+                        {horoscope.horoscope_data.split(/(?<=[.!?])\s*(?=[A-Z])/g).map((paragraph, index) => (
+                            <p key={index} className="mb-4" style={{ textIndent: '2em' }}>
+                                {paragraph.trim()}
                             </p>
                         ))}
                     </div>
                 )}
             </div>
         </motion.div>
+    );
+};
+
+const CardDisplay = ({ card, positionLabel, onCardClick }) => {
+    return (
+        <div className="flex flex-col items-center text-center cursor-pointer" onClick={() => onCardClick(card)}>
+            <motion.div 
+              className="relative w-full aspect-[2/3.5] bg-gray-700 rounded-xl overflow-hidden"
+              whileHover={{ scale: 1.05, y: -5 }}
+              transition={{ type: 'spring', stiffness: 300 }}
+            >
+               <img
+                    src={`${API_ENDPOINTS.tarotImageBase}${card.img}`}
+                    alt={card.name}
+                    className={`w-full h-full object-cover ${card.isReversed ? 'rotate-180' : ''}`}
+                    onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/200x350/1f2937/9333ea?text=Card+Art'; }}
+                />
+            </motion.div>
+             <div className="mt-2">
+                <p className="font-semibold text-sm sm:text-base text-foreground">{card.name}</p>
+                {positionLabel && <p className="text-xs sm:text-sm text-foreground/60">{positionLabel}</p>}
+             </div>
+        </div>
     );
 };
 
@@ -395,29 +418,6 @@ const CelticCrossLayout = ({ cards, onCardClick }) => {
             <div className="col-start-4 row-start-3"><CardDisplay card={cards[7]} positionLabel={positions[7]} onCardClick={onCardClick} /></div>
             <div className="col-start-4 row-start-2"><CardDisplay card={cards[8]} positionLabel={positions[8]} onCardClick={onCardClick} /></div>
             <div className="col-start-4 row-start-1"><CardDisplay card={cards[9]} positionLabel={positions[9]} onCardClick={onCardClick} /></div>
-        </div>
-    );
-};
-
-const CardDisplay = ({ card, positionLabel, onCardClick }) => {
-    return (
-        <div className="flex flex-col items-center text-center cursor-pointer" onClick={() => onCardClick(card)}>
-            <motion.div 
-              className="relative w-full aspect-[2/3.5] bg-gray-700 rounded-xl overflow-hidden"
-              whileHover={{ scale: 1.05, y: -5 }}
-              transition={{ type: 'spring', stiffness: 300 }}
-            >
-               <img
-                    src={`${API_ENDPOINTS.tarotImageBase}${card.img}`}
-                    alt={card.name}
-                    className={`w-full h-full object-cover ${card.isReversed ? 'rotate-180' : ''}`}
-                    onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/200x350/1f2937/9333ea?text=Card+Art'; }}
-                />
-            </motion.div>
-             <div className="mt-2">
-                <p className="font-semibold text-sm sm:text-base text-foreground">{card.name}</p>
-                {positionLabel && <p className="text-xs sm:text-sm text-foreground/60">{positionLabel}</p>}
-             </div>
         </div>
     );
 };

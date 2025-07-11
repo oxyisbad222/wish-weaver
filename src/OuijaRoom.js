@@ -5,12 +5,12 @@ import { Users, Plus, LogOut, Crown } from 'lucide-react';
 import { API_ENDPOINTS } from './App';
 
 const spiritResponses = [
-    "YES", "NO", "PERHAPS", "THE SPIRITS ARE UNCLEAR", "HELLO",
-    "CONSULT ELSEWHERE I AM UNINTERESTED", "...HERE", "LIKELY", "CHECK YOUR SURROUNDINGS", "SkyDev IS A GENIUS!",
-    "DON'T LEAVE YET.", "STAY", "SO DOUBTFUL...", "NO REST",
-    "THE VEIL IS TOO THICK", "...---...SOS SOS SOS...---...", "BEWARE",
-    "GOODBYE", "FOCUS", "WEAK", "AN UNSEEN PRESENCE IS NEAR YOU",
-    "SIGNS", "SEEK NOT", "TIME TO GO", "WE ARE ALWAYS WATCHING", "NOT ALONE", "ITS BEHIND YOU"
+    "YES", "NO", "PERHAPS", "THE SPIRITS ARE UNCLEAR", "ASK AGAIN LATER", "IT IS CERTAIN",
+    "WITHOUT A DOUBT", "YOU MAY RELY ON IT", "MOST LIKELY", "OUTLOOK GOOD", "SIGNS POINT TO YES",
+    "DON'T COUNT ON IT", "MY SOURCES SAY NO", "VERY DOUBTFUL", "THE STARS ARE NOT ALIGNED",
+    "THE VEIL IS TOO THICK", "A MESSAGE IS TRYING TO COME THROUGH", "BEWARE OF TRICKSTER SPIRITS",
+    "GOODBYE", "FOCUS AND ASK AGAIN", "THE ENERGY IS WEAK", "AN UNSEEN PRESENCE IS NEAR",
+    "LOOK FOR A SIGN", "THE ANSWER IS WITHIN YOU", "ANOTHER TIME", "WE ARE ALWAYS WATCHING", "NOT ALONE", "IT'S BEHIND YOU"
 ];
 
 const scaryEventMessage = "GET OUT GET OUT GOODBYE";
@@ -38,20 +38,20 @@ const OuijaBoard = ({ room, user, db }) => {
         return () => clearInterval(interval);
 
     }, [room.gamePhase, room.guidingMessage, room.currentMessage]);
-
+    
     useEffect(() => {
         if (room.host.uid === user.uid && room.gamePhase === 'session' && animatedMessage.length === room.guidingMessage.length) {
             const timeoutId = setTimeout(async () => {
                 const roomRef = doc(db, 'ouijaRooms', room.id);
-                await updateDoc(roomRef, {
-                    gamePhase: 'focus', // Go back to asking a question
+                await updateDoc(roomRef, { 
+                    gamePhase: 'focus',
                     currentMessage: room.guidingMessage,
-                    guidingMessage: '',
+                    guidingMessage: '', 
                     focusMessages: [],
                     votes: {},
                     ready: {}
                 });
-            }, 2500);
+            }, 2000);
             return () => clearTimeout(timeoutId);
         }
     }, [animatedMessage, room, user, db]);
@@ -106,7 +106,8 @@ const RoomLobby = ({ onJoinRoom, db, user, userData, setNotification }) => {
 
     useEffect(() => {
         if (!db) return;
-        const q = query(collection(db, 'ouijaRooms'), where('isPublic', '==', true));
+        const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+        const q = query(collection(db, 'ouijaRooms'), where('isPublic', '==', true), where('createdAt', '>', threeHoursAgo));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const roomsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setRooms(roomsData);
@@ -370,7 +371,7 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
     }, [currentRoomId, user.uid, userData, db, showNotification]);
 
     useEffect(() => {
-        if (!currentRoom || currentRoom.host.uid !== user.uid || !db) return;
+        if (!currentRoom || !db) return;
 
         const roomRef = doc(db, 'ouijaRooms', currentRoom.id);
         const participantsCount = currentRoom.participants?.length || 0;
@@ -389,7 +390,7 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
                     let spiritResponse;
                     const chance = Math.random();
 
-                    if (chance < 0.1) { // 10% chance for a scary event
+                    if (chance < 0.1) {
                         spiritResponse = scaryEventMessage;
                     } else {
                         do {
@@ -402,14 +403,14 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
             }
         }
 
-    }, [currentRoom, user.uid, db]);
+    }, [currentRoom, db]);
     
     useEffect(() => {
         if (currentRoom?.guidingMessage === scaryEventMessage && currentRoom.gamePhase === 'session') {
             setTimeout(() => {
                 showNotification("THE CONNECTION HAS BEEN SEVERED", "error");
-                handleLeaveRoom(true); // Force leave
-            }, 5000); // Give users time to read the scary message
+                handleLeaveRoom(true);
+            }, 5000);
         }
     }, [currentRoom, showNotification]);
 
@@ -454,7 +455,7 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
         } finally {
             setCurrentRoom(null);
             setCurrentRoomId(null);
-            if (force) onBack(); // Go back to the dashboard if forced out
+            if (force) onBack();
         }
     };
 
