@@ -1,17 +1,19 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { doc, setDoc, updateDoc, arrayUnion, collection, query, where, onSnapshot, serverTimestamp, runTransaction } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, Plus, LogOut, Crown } from 'lucide-react';
 import { API_ENDPOINTS } from './App';
 
 const spiritResponses = [
-    "YES", "NO", "PERHAPS", "THE SPIRITS ARE UNCLEAR", "ASK AGAIN LATER", "IT IS CERTAIN",
-    "WITHOUT A DOUBT", "YOU MAY RELY ON IT", "MOST LIKELY", "OUTLOOK GOOD", "SIGNS POINT TO YES",
-    "DON'T COUNT ON IT", "MY SOURCES SAY NO", "VERY DOUBTFUL", "THE STARS ARE NOT ALIGNED",
-    "THE VEIL IS TOO THICK", "A MESSAGE IS TRYING TO COME THROUGH", "BEWARE OF TRICKSTER SPIRITS",
-    "GOODBYE", "FOCUS AND ASK AGAIN", "THE ENERGY IS WEAK", "AN UNSEEN PRESENCE IS NEAR",
-    "LOOK FOR A SIGN", "THE ANSWER IS WITHIN YOU", "ANOTHER TIME"
+    "YES", "NO", "PERHAPS", "THE SPIRITS ARE UNCLEAR", "HELLO",
+    "CONSULT ELSEWHERE I AM UNINTERESTED", "...HERE", "LIKELY", "CHECK YOUR SURROUNDINGS", "SkyDev IS A GENIUS!",
+    "DON'T LEAVE YET.", "STAY", "SO DOUBTFUL...", "NO REST",
+    "THE VEIL IS TOO THICK", "...---...SOS SOS SOS...---...", "BEWARE",
+    "GOODBYE", "FOCUS", "WEAK", "AN UNSEEN PRESENCE IS NEAR YOU",
+    "SIGNS", "SEEK NOT", "TIME TO GO", "WE ARE ALWAYS WATCHING", "NOT ALONE", "ITS BEHIND YOU"
 ];
+
+const scaryEventMessage = "GET OUT GET OUT GOODBYE";
 
 const OuijaBoard = ({ room, user, db }) => {
     const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890".split('');
@@ -25,35 +27,36 @@ const OuijaBoard = ({ room, user, db }) => {
 
         const interval = setInterval(() => {
             setAnimatedMessage(prev => {
-                const nextCharIndex = prev.length;
-                if (nextCharIndex < room.guidingMessage.length) {
-                    return room.guidingMessage.substring(0, nextCharIndex + 1);
+                if (prev.length < room.guidingMessage.length) {
+                    return room.guidingMessage.substring(0, prev.length + 1);
                 }
                 clearInterval(interval);
                 return prev;
             });
-        }, 800); // Slower reveal for suspense
+        }, 800);
 
         return () => clearInterval(interval);
 
     }, [room.gamePhase, room.guidingMessage, room.currentMessage]);
-    
+
     useEffect(() => {
         if (room.host.uid === user.uid && room.gamePhase === 'session' && animatedMessage.length === room.guidingMessage.length) {
             const timeoutId = setTimeout(async () => {
                 const roomRef = doc(db, 'ouijaRooms', room.id);
-                await updateDoc(roomRef, { 
-                    gamePhase: 'idle',
+                await updateDoc(roomRef, {
+                    gamePhase: 'focus', // Go back to asking a question
                     currentMessage: room.guidingMessage,
-                    guidingMessage: '', 
+                    guidingMessage: '',
                     focusMessages: [],
                     votes: {},
                     ready: {}
                 });
-            }, 2000); // Pause at the end of the message
+            }, 2500);
             return () => clearTimeout(timeoutId);
         }
     }, [animatedMessage, room, user, db]);
+
+    const lastAnimatedChar = animatedMessage[animatedMessage.length - 1];
 
     return (
         <div className="relative w-full max-w-3xl mx-auto bg-slate-900/50 p-4 sm:p-8 rounded-3xl shadow-2xl border-2 border-purple-500/30 select-none aspect-[16/10] flex flex-col justify-center">
@@ -61,23 +64,20 @@ const OuijaBoard = ({ room, user, db }) => {
             <div className="absolute top-4 sm:top-8 right-6 sm:right-12 text-xl sm:text-2xl font-serif text-primary">NO</div>
 
             <div className="flex flex-wrap justify-center items-center gap-x-2 sm:gap-x-3 gap-y-1 sm:gap-y-2 px-4 sm:px-16">
-                {characters.map(char => {
-                    const isLastChar = animatedMessage[animatedMessage.length - 1] === char;
-                    return (
-                        <motion.span
-                            key={char}
-                            className="text-lg sm:text-2xl font-serif text-purple-200/90 transition-colors"
-                            animate={{
-                                color: isLastChar ? '#fff' : '#c4b5fd',
-                                scale: isLastChar ? 1.5 : 1,
-                                textShadow: isLastChar ? '0 0 15px #a78bfa' : 'none'
-                            }}
-                            transition={{ duration: 0.3, ease: 'easeOut' }}
-                        >
-                            {char}
-                        </motion.span>
-                    )
-                })}
+                {characters.map(char => (
+                    <motion.span
+                        key={char}
+                        className="text-lg sm:text-2xl font-serif text-purple-200/90 transition-colors"
+                        animate={{
+                            color: lastAnimatedChar === char ? '#fff' : '#c4b5fd',
+                            scale: lastAnimatedChar === char ? [1, 1.5, 1] : 1,
+                            textShadow: lastAnimatedChar === char ? '0 0 15px #a78bfa' : 'none'
+                        }}
+                        transition={{ duration: 0.8, ease: 'easeInOut' }}
+                    >
+                        {char}
+                    </motion.span>
+                ))}
             </div>
 
             <div className="absolute bottom-4 sm:bottom-8 left-1/2 -translate-x-1/2 text-xl sm:text-2xl font-serif text-primary">GOODBYE</div>
@@ -132,13 +132,12 @@ const RoomLobby = ({ onJoinRoom, db, user, userData, setNotification }) => {
             participants: [{ uid: user.uid, username: userData.username, avatarSeed: userData.avatarSeed }],
             participantUids: [user.uid],
             createdAt: serverTimestamp(),
-            currentMessage: 'The veil is thin...',
-            gamePhase: 'idle',
+            currentMessage: '',
+            gamePhase: 'focus',
             focusMessages: [],
             votes: {},
             ready: {},
             guidingMessage: '',
-            guidingMessageIndex: 0,
         };
         await setDoc(newRoomRef, roomData);
         setShowCreateModal(false);
@@ -262,13 +261,13 @@ const FocusPhase = ({ user, room, setNotification, db }) => {
     };
 
     return (
-        <div className="text-center p-6 bg-card rounded-xl border border-border">
+        <div className="text-center p-6 bg-card rounded-xl border border-border w-full max-w-lg">
             <h3 className="text-2xl font-serif text-primary mb-4">Focus Your Energy</h3>
-            <p className="text-foreground/70 mb-6">Submit a question or topic for the oracle to consider. All participants will vote on which question to ask.</p>
+            <p className="text-foreground/70 mb-6">Submit a question for the spirits. All participants will vote on which question to ask.</p>
             {hasSubmitted ? (
                 <p className="text-green-400 font-semibold">You have submitted your question. Waiting for others...</p>
             ) : (
-                <div className="flex space-x-2">
+                <div className="flex flex-col space-y-4">
                     <input
                         type="text"
                         value={message}
@@ -276,7 +275,9 @@ const FocusPhase = ({ user, room, setNotification, db }) => {
                         placeholder="What do you wish to know?"
                         className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary"
                     />
-                    <button onClick={handleSubmit} disabled={!message.trim()} className="bg-primary text-primary-foreground px-4 rounded-lg disabled:opacity-50">Submit</button>
+                    <button onClick={handleSubmit} disabled={!message.trim()} className="w-full bg-primary text-primary-foreground font-semibold py-3 px-6 rounded-lg transition-colors hover:bg-primary/90 disabled:opacity-50">
+                        SUBMIT YOUR QUESTION
+                    </button>
                 </div>
             )}
         </div>
@@ -304,7 +305,7 @@ const VotingPhase = ({ user, room, setNotification, db }) => {
     };
 
     return (
-        <div className="p-6 bg-card rounded-xl border border-border">
+        <div className="p-6 bg-card rounded-xl border border-border w-full max-w-lg">
             <h3 className="text-2xl font-serif text-primary mb-4 text-center">Vote on the Question</h3>
             <div className="space-y-3">
                 {room.focusMessages?.map(msg => {
@@ -374,14 +375,6 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
         const roomRef = doc(db, 'ouijaRooms', currentRoom.id);
         const participantsCount = currentRoom.participants?.length || 0;
 
-        if (currentRoom.gamePhase === 'idle' && Object.keys(currentRoom.ready || {}).length === participantsCount && participantsCount > 0) {
-            const spiritResponse = spiritResponses[Math.floor(Math.random() * spiritResponses.length)];
-            updateDoc(roomRef, {
-                gamePhase: 'session',
-                guidingMessage: spiritResponse.toUpperCase(),
-            });
-        }
-
         if (currentRoom.gamePhase === 'focus' && currentRoom.focusMessages?.length === participantsCount && participantsCount > 0) {
             updateDoc(roomRef, { gamePhase: 'voting' });
         }
@@ -391,32 +384,40 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
             if (totalVotes === participantsCount && participantsCount > 0) {
                  const winningMessageId = Object.entries(currentRoom.votes).sort((a, b) => b[1].length - a[1].length)[0][0];
                  const winningMessage = currentRoom.focusMessages.find(m => m.id === winningMessageId)?.message;
+
                  if (winningMessage) {
                     let spiritResponse;
-                    do {
-                        spiritResponse = spiritResponses[Math.floor(Math.random() * spiritResponses.length)];
-                    } while (spiritResponse === currentRoom.currentMessage);
+                    const chance = Math.random();
 
-                    updateDoc(roomRef, { gamePhase: 'session', guidingMessage: spiritResponse.toUpperCase() });
+                    if (chance < 0.1) { // 10% chance for a scary event
+                        spiritResponse = scaryEventMessage;
+                    } else {
+                        do {
+                            spiritResponse = spiritResponses[Math.floor(Math.random() * spiritResponses.length)];
+                        } while (spiritResponse === currentRoom.currentMessage);
+                    }
+                    
+                    updateDoc(roomRef, { gamePhase: 'session', guidingMessage: spiritResponse });
                  }
             }
         }
 
     }, [currentRoom, user.uid, db]);
     
-    const handleReady = async () => {
-        if (!currentRoomId || !db) return;
-        const roomRef = doc(db, 'ouijaRooms', currentRoomId);
-        await updateDoc(roomRef, {
-            [`ready.${user.uid}`]: true
-        });
-    };
+    useEffect(() => {
+        if (currentRoom?.guidingMessage === scaryEventMessage && currentRoom.gamePhase === 'session') {
+            setTimeout(() => {
+                showNotification("THE CONNECTION HAS BEEN SEVERED", "error");
+                handleLeaveRoom(true); // Force leave
+            }, 5000); // Give users time to read the scary message
+        }
+    }, [currentRoom, showNotification]);
 
     const handleJoinRoom = (roomId) => {
         setCurrentRoomId(roomId);
     };
 
-    const handleLeaveRoom = async () => {
+    const handleLeaveRoom = async (force = false) => {
         if (!currentRoomId || !db) return;
         const roomRef = doc(db, 'ouijaRooms', currentRoomId);
 
@@ -425,6 +426,11 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
                 const roomDoc = await transaction.get(roomRef);
                 if (!roomDoc.exists()) return;
                 const roomData = roomDoc.data();
+
+                if (force) {
+                    transaction.delete(roomRef);
+                    return;
+                }
 
                 const remainingParticipants = roomData.participants.filter(p => p.uid !== user.uid);
                 const remainingUids = roomData.participantUids.filter(uid => uid !== user.uid);
@@ -448,13 +454,8 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
         } finally {
             setCurrentRoom(null);
             setCurrentRoomId(null);
+            if (force) onBack(); // Go back to the dashboard if forced out
         }
-    };
-
-    const startFocusPhase = async () => {
-        if (currentRoom.host.uid !== user.uid || !db) return;
-        const roomRef = doc(db, 'ouijaRooms', currentRoom.id);
-        await updateDoc(roomRef, { gamePhase: 'focus', currentMessage: '', focusMessages: [], votes: {}, ready: {} });
     };
 
     const renderGamePhaseContent = () => {
@@ -464,24 +465,8 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
             case 'voting':
                 return <VotingPhase user={user} room={currentRoom} setNotification={showNotification} db={db} />;
             case 'session':
-            case 'idle':
             default:
-                const isReady = currentRoom.ready && currentRoom.ready[user.uid];
-                return (
-                    <div className="text-center flex flex-col items-center justify-center w-full h-full">
-                        <OuijaBoard room={currentRoom} user={user} db={db} />
-                        {currentRoom.gamePhase === 'idle' && (
-                            <button onClick={handleReady} disabled={isReady} className="mt-6 bg-primary text-primary-foreground font-semibold py-3 px-6 rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50">
-                                {isReady ? "Waiting for others..." : "Ready..."}
-                            </button>
-                        )}
-                        {currentRoom.host.uid === user.uid && currentRoom.gamePhase === 'idle' && (
-                            <button onClick={startFocusPhase} className="mt-4 text-sm text-primary hover:underline">
-                                Ask a question instead?
-                            </button>
-                        )}
-                    </div>
-                );
+                return <OuijaBoard room={currentRoom} user={user} db={db} />;
         }
     };
 
@@ -500,17 +485,17 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
                     <h2 className="text-2xl sm:text-3xl font-serif text-primary">{currentRoom.name}</h2>
                     <p className="text-foreground/60">Hosted by @{currentRoom.host.username}</p>
                 </div>
-                <button onClick={handleLeaveRoom} className="flex items-center space-x-2 bg-red-500/20 text-red-400 font-semibold py-2 px-4 rounded-lg hover:bg-red-500/30 transition-colors">
+                <button onClick={() => handleLeaveRoom(false)} className="flex items-center space-x-2 bg-red-500/20 text-red-400 font-semibold py-2 px-4 rounded-lg hover:bg-red-500/30 transition-colors">
                     <LogOut size={16} />
                     <span className="hidden sm:inline">Leave</span>
                 </button>
             </div>
 
-            <div className="flex-grow flex flex-col md:flex-row gap-6">
+            <div className="flex-grow flex flex-col lg:flex-row gap-6">
                 <div className="flex-grow flex items-center justify-center">
                     {renderGamePhaseContent()}
                 </div>
-                <div className="w-full md:w-64 lg:w-72 flex-shrink-0 bg-card p-4 rounded-xl border border-border self-start">
+                <div className="w-full lg:w-72 flex-shrink-0 bg-card p-4 rounded-xl border border-border self-start">
                     <h3 className="text-lg font-semibold text-card-foreground mb-3 flex items-center"><Users size={18} className="mr-2"/>Participants</h3>
                     <div className="space-y-3">
                         {currentRoom.participants?.map(p => (

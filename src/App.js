@@ -587,6 +587,7 @@ const TarotReading = ({ user, showNotification }) => {
                     )}
                 </div>
             )}
+             <p className="text-center text-foreground/60 mt-8 text-sm">Tap any card to reveal its meaning.</p>
         </div>
     );
 };
@@ -1551,7 +1552,7 @@ const App = () => {
     }
 
     return (
-        <div className="bg-background text-foreground font-sans min-h-screen">
+        <div className="bg-background text-foreground font-sans min-h-screen overscroll-none">
             <Notification message={notification.message} type={notification.type} />
             {!(userData && userData.needsSetup) && !chattingWith && <Header userData={userData} onLogout={handleLogout} onLogoClick={navigateToRoot} onAvatarClick={() => navigate('profile')} onBack={back} canGoBack={canGoBack} />}
             <main className={chattingWith ? "h-screen" : "pb-24 md:pb-4"}>
