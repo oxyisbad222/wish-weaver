@@ -374,6 +374,31 @@ const Horoscope = ({ zodiac }) => {
     );
 };
 
+const CelticCrossLayout = ({ cards, onCardClick }) => {
+    const positions = [
+        "1. Heart of the Matter", "2. The Obstacle", "3. The Foundation", "4. The Recent Past",
+        "5. The Crown", "6. The Near Future", "7. Your Attitude", "8. External Influences",
+        "9. Hopes and Fears", "10. The Outcome"
+    ];
+
+    return (
+        <div className="w-full max-w-md mx-auto p-2 grid grid-cols-4 gap-2">
+            <div className="col-start-2 row-start-2"><CardDisplay card={cards[0]} positionLabel={positions[0]} onCardClick={onCardClick} /></div>
+            <div className="col-start-2 row-start-2 -rotate-90"><CardDisplay card={cards[1]} positionLabel={positions[1]} onCardClick={onCardClick} /></div>
+            
+            <div className="col-start-3 row-start-2"><CardDisplay card={cards[4]} positionLabel={positions[4]} onCardClick={onCardClick} /></div>
+            <div className="col-start-1 row-start-2"><CardDisplay card={cards[3]} positionLabel={positions[3]} onCardClick={onCardClick} /></div>
+            <div className="col-start-2 row-start-3"><CardDisplay card={cards[2]} positionLabel={positions[2]} onCardClick={onCardClick} /></div>
+            <div className="col-start-2 row-start-1"><CardDisplay card={cards[5]} positionLabel={positions[5]} onCardClick={onCardClick} /></div>
+
+            <div className="col-start-4 row-start-4"><CardDisplay card={cards[6]} positionLabel={positions[6]} onCardClick={onCardClick} /></div>
+            <div className="col-start-4 row-start-3"><CardDisplay card={cards[7]} positionLabel={positions[7]} onCardClick={onCardClick} /></div>
+            <div className="col-start-4 row-start-2"><CardDisplay card={cards[8]} positionLabel={positions[8]} onCardClick={onCardClick} /></div>
+            <div className="col-start-4 row-start-1"><CardDisplay card={cards[9]} positionLabel={positions[9]} onCardClick={onCardClick} /></div>
+        </div>
+    );
+};
+
 const CardDisplay = ({ card, positionLabel, onCardClick }) => {
     return (
         <div className="flex flex-col items-center text-center cursor-pointer" onClick={() => onCardClick(card)}>
@@ -396,34 +421,6 @@ const CardDisplay = ({ card, positionLabel, onCardClick }) => {
         </div>
     );
 };
-
-const CelticCrossLayout = ({ cards, onCardClick }) => {
-    const positions = [
-        "1. Heart of the Matter", "2. The Obstacle", "3. The Foundation", "4. The Recent Past",
-        "5. The Crown", "6. The Near Future", "7. Your Attitude", "8. External Influences",
-        "9. Hopes and Fears", "10. The Outcome"
-    ];
-
-    return (
-        <div className="w-full max-w-md mx-auto p-2 grid grid-cols-4 gap-2">
-            {/* The Cross */}
-            <div className="col-start-2 row-start-2"><CardDisplay card={cards[0]} positionLabel={positions[0]} onCardClick={onCardClick} /></div>
-            <div className="col-start-2 row-start-2 -rotate-90"><CardDisplay card={cards[1]} positionLabel={positions[1]} onCardClick={onCardClick} /></div>
-            
-            <div className="col-start-3 row-start-2"><CardDisplay card={cards[4]} positionLabel={positions[4]} onCardClick={onCardClick} /></div>
-            <div className="col-start-1 row-start-2"><CardDisplay card={cards[3]} positionLabel={positions[3]} onCardClick={onCardClick} /></div>
-            <div className="col-start-2 row-start-3"><CardDisplay card={cards[2]} positionLabel={positions[2]} onCardClick={onCardClick} /></div>
-            <div className="col-start-2 row-start-1"><CardDisplay card={cards[5]} positionLabel={positions[5]} onCardClick={onCardClick} /></div>
-
-            {/* The Staff */}
-            <div className="col-start-4 row-start-4"><CardDisplay card={cards[6]} positionLabel={positions[6]} onCardClick={onCardClick} /></div>
-            <div className="col-start-4 row-start-3"><CardDisplay card={cards[7]} positionLabel={positions[7]} onCardClick={onCardClick} /></div>
-            <div className="col-start-4 row-start-2"><CardDisplay card={cards[8]} positionLabel={positions[8]} onCardClick={onCardClick} /></div>
-            <div className="col-start-4 row-start-1"><CardDisplay card={cards[9]} positionLabel={positions[9]} onCardClick={onCardClick} /></div>
-        </div>
-    );
-};
-
 
 const TarotReading = ({ user, showNotification }) => {
     const [fullDeck, setFullDeck] = useState([]);
@@ -1091,7 +1088,7 @@ const FriendsList = ({ user, userData, setNotification, setChattingWith }) => {
     useEffect(() => {
         fetchFriendsAndRequests();
     }, [userData, fetchFriendsAndRequests]);
-    
+
     const handleRemoveFriend = async (friendUid) => {
         if (!window.confirm("Are you sure you want to remove this friend?")) return;
         
@@ -1279,11 +1276,6 @@ const FindFriends = ({ user, userData, setNotification }) => {
     };
 
     const handleSendRequest = async (targetUid) => {
-        if (!userData) {
-            setNotification("Your user data isn't loaded yet. Please wait.", "error");
-            return;
-        }
-        
         const batch = writeBatch(db);
         const currentUserRef = doc(db, "users", user.uid);
         const targetUserRef = doc(db, "users", targetUid);

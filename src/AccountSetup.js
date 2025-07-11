@@ -32,7 +32,7 @@ const AccountSetup = ({ user, db, onSetupComplete }) => {
     const [pronouns, setPronouns] = useState('');
     const [zodiac, setZodiac] = useState('Aries');
     const [avatarSeed, setAvatarSeed] = useState(user.uid);
-    const [avatarStyle] = useState('notionists'); // Default style
+    const [avatarStyle] = useState('notionists');
     const [error, setError] = useState('');
 
     const zodiacSigns = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
@@ -101,7 +101,7 @@ const AccountSetup = ({ user, db, onSetupComplete }) => {
             const userDocRef = doc(db, "users", user.uid);
             const usernameDocRef = doc(db, "usernames", username);
 
-            batch.set(usernameDocRef, { uid: user.uid });
+            batch.set(usernameDocRef, { uid: user.uid, username });
             batch.update(userDocRef, {
                 username,
                 preferredName,
