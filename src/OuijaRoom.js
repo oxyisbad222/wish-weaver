@@ -1,16 +1,16 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { doc, setDoc, updateDoc, arrayUnion, collection, query, where, onSnapshot, serverTimestamp, runTransaction } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Plus, LogOut, Crown } from 'lucide-react';
+import { Users, Plus, LogOut, Crown, Info } from 'lucide-react';
 import { API_ENDPOINTS } from './App';
 
 const spiritResponses = [
-    "YES", "NO", "PERHAPS", "THE SPIRITS ARE UNCLEAR", "ASK AGAIN LATER", "IT IS CERTAIN",
-    "WITHOUT A DOUBT", "YOU MAY RELY ON IT", "MOST LIKELY", "OUTLOOK GOOD", "SIGNS POINT TO YES",
-    "DON'T COUNT ON IT", "MY SOURCES SAY NO", "VERY DOUBTFUL", "THE STARS ARE NOT ALIGNED",
-    "THE VEIL IS TOO THICK", "A MESSAGE IS TRYING TO COME THROUGH", "BEWARE OF TRICKSTER SPIRITS",
-    "GOODBYE", "FOCUS AND ASK AGAIN", "THE ENERGY IS WEAK", "AN UNSEEN PRESENCE IS NEAR",
-    "LOOK FOR A SIGN", "THE ANSWER IS WITHIN YOU", "ANOTHER TIME", "WE ARE ALWAYS WATCHING", "NOT ALONE", "IT'S BEHIND YOU"
+    "YES", "NO", "PERHAPS", "THE SPIRITS ARE UNCLEAR", "HELLO",
+    "CONSULT ELSEWHERE I AM UNINTERESTED", "...HERE", "LIKELY", "CHECK YOUR SURROUNDINGS", "SkyDev IS A GENIUS!",
+    "DON'T LEAVE YET.", "STAY", "SO DOUBTFUL...", "NO REST",
+    "THE VEIL IS TOO THICK", "...---...SOS SOS SOS...---...", "BEWARE",
+    "GOODBYE", "FOCUS", "WEAK", "AN UNSEEN PRESENCE IS NEAR YOU",
+    "SIGNS", "SEEK NOT", "TIME TO GO", "WATCHING", "NOT ALONE", "ITS BEHIND YOU"
 ];
 
 const scaryEventMessage = "GET OUT GET OUT GOODBYE";
@@ -107,18 +107,21 @@ const RoomLobby = ({ onJoinRoom, db, user, userData, setNotification }) => {
     useEffect(() => {
         if (!db) return;
         const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
-        const q = query(collection(db, 'ouijaRooms'), where('isPublic', '==', true), where('createdAt', '>', threeHoursAgo));
+        const q = query(collection(db, 'ouijaRooms'), where('createdAt', '>', threeHoursAgo));
+
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const roomsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setRooms(roomsData);
+            const publicRooms = roomsData.filter(room => room.isPublic);
+            const privateRooms = roomsData.filter(room => !room.isPublic && room.participantUids.includes(user.uid));
+            setRooms([...publicRooms, ...privateRooms]);
             setIsLoading(false);
         }, (error) => {
-            console.error("Error fetching public rooms:", error);
-            setNotification("Could not fetch public rooms.", "error");
+            console.error("Error fetching rooms:", error);
+            setNotification("Could not fetch rooms.", "error");
             setIsLoading(false);
         });
         return () => unsubscribe();
-    }, [db, setNotification]);
+    }, [db, setNotification, user.uid]);
 
     const handleCreateRoom = async (name, isPublic) => {
         if (!db || !userData?.username) {
@@ -157,8 +160,11 @@ const RoomLobby = ({ onJoinRoom, db, user, userData, setNotification }) => {
                     <span>Create Room</span>
                 </button>
             </div>
+            <div className="text-center bg-yellow-900/50 text-yellow-300 p-3 rounded-lg mb-4 text-sm">
+                <strong>Note:</strong> The Ouija Room is a work in progress and currently in a testing phase.
+            </div>
             <div className="bg-card p-4 rounded-xl border border-border">
-                <h3 className="text-xl font-semibold text-card-foreground mb-4">Public Rooms</h3>
+                <h3 className="text-xl font-semibold text-card-foreground mb-4">Join a Room</h3>
                 {isLoading ? (
                     <p className="text-card-foreground/70">Searching for spirits...</p>
                 ) : rooms.length > 0 ? (
@@ -182,7 +188,7 @@ const RoomLobby = ({ onJoinRoom, db, user, userData, setNotification }) => {
                         ))}
                     </div>
                 ) : (
-                    <p className="text-card-foreground/70 text-center py-4">No public rooms are active. Create one!</p>
+                    <p className="text-card-foreground/70 text-center py-4">No rooms are active. Create one!</p>
                 )}
             </div>
         </div>
@@ -224,7 +230,15 @@ const CreateRoomModal = ({ onClose, onCreate }) => {
                         className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors mb-4"
                     />
                     <div className="flex items-center justify-between mb-6">
-                        <label className="text-foreground/80">Make room public?</label>
+                        <label className="text-foreground/80 flex items-center">
+                            Make room public?
+                            <div className="group relative flex items-center ml-2">
+                                <Info size={16} className="text-foreground/50"/>
+                                <div className="absolute bottom-full mb-2 w-48 bg-background border border-border p-2 rounded-lg text-xs text-foreground/70 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    Public rooms are visible to everyone. Private rooms are only visible to your friends.
+                                </div>
+                            </div>
+                        </label>
                         <button type="button" onClick={() => setIsPublic(!isPublic)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isPublic ? 'bg-primary' : 'bg-input'}`}>
                             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isPublic ? 'translate-x-6' : 'translate-x-1'}`}/>
                         </button>
@@ -356,7 +370,6 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
                     });
                 }
             } else {
-                showNotification("The room no longer exists.", "error");
                 setCurrentRoom(null);
                 setCurrentRoomId(null);
             }
@@ -375,35 +388,37 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
 
         const roomRef = doc(db, 'ouijaRooms', currentRoom.id);
         const participantsCount = currentRoom.participants?.length || 0;
+        
+        if (currentRoom.host.uid === user.uid) {
+            if (currentRoom.gamePhase === 'focus' && currentRoom.focusMessages?.length === participantsCount && participantsCount > 0) {
+                updateDoc(roomRef, { gamePhase: 'voting' });
+            }
 
-        if (currentRoom.gamePhase === 'focus' && currentRoom.focusMessages?.length === participantsCount && participantsCount > 0) {
-            updateDoc(roomRef, { gamePhase: 'voting' });
-        }
+            if (currentRoom.gamePhase === 'voting') {
+                const totalVotes = Object.values(currentRoom.votes || {}).flat().length;
+                if (totalVotes === participantsCount && participantsCount > 0) {
+                    const winningMessageId = Object.entries(currentRoom.votes).sort((a, b) => b[1].length - a[1].length)[0][0];
+                    const winningMessage = currentRoom.focusMessages.find(m => m.id === winningMessageId)?.message;
 
-        if (currentRoom.gamePhase === 'voting') {
-            const totalVotes = Object.values(currentRoom.votes || {}).flat().length;
-            if (totalVotes === participantsCount && participantsCount > 0) {
-                 const winningMessageId = Object.entries(currentRoom.votes).sort((a, b) => b[1].length - a[1].length)[0][0];
-                 const winningMessage = currentRoom.focusMessages.find(m => m.id === winningMessageId)?.message;
+                    if (winningMessage) {
+                        let spiritResponse;
+                        const chance = Math.random();
 
-                 if (winningMessage) {
-                    let spiritResponse;
-                    const chance = Math.random();
-
-                    if (chance < 0.1) {
-                        spiritResponse = scaryEventMessage;
-                    } else {
-                        do {
-                            spiritResponse = spiritResponses[Math.floor(Math.random() * spiritResponses.length)];
-                        } while (spiritResponse === currentRoom.currentMessage);
+                        if (chance < 0.1) {
+                            spiritResponse = scaryEventMessage;
+                        } else {
+                            do {
+                                spiritResponse = spiritResponses[Math.floor(Math.random() * spiritResponses.length)];
+                            } while (spiritResponse === currentRoom.currentMessage);
+                        }
+                        
+                        updateDoc(roomRef, { gamePhase: 'session', guidingMessage: spiritResponse });
                     }
-                    
-                    updateDoc(roomRef, { gamePhase: 'session', guidingMessage: spiritResponse });
-                 }
+                }
             }
         }
-
-    }, [currentRoom, db]);
+        
+    }, [currentRoom, user.uid, db]);
     
     useEffect(() => {
         if (currentRoom?.guidingMessage === scaryEventMessage && currentRoom.gamePhase === 'session') {
