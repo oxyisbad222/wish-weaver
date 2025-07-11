@@ -22,6 +22,8 @@ const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
 export const API_ENDPOINTS = {
+    horoscope: (sign, type) => `/api/horoscope?sign=${sign.toLowerCase()}&type=${type}`,
+    tarotImageBase: './cards/',
     avatar: (seed, style = 'notionists') => `https://api.dicebear.com/8.x/${style}/svg?seed=${seed}&backgroundColor=f0e7f7,e0f0e9,d1d4f9`
 };
 
@@ -300,8 +302,10 @@ const Horoscope = ({ zodiac }) => {
         setError(null);
         setHoroscope(null);
         
+        const url = API_ENDPOINTS.horoscope(zodiac, timeframe);
+
         try {
-            const response = await fetch(`/api/horoscope?sign=${zodiac.toLowerCase()}&type=${timeframe}`);
+            const response = await fetch(url);
             const data = await response.json();
             
             if (!response.ok || !data.success) {
@@ -591,7 +595,6 @@ const Profile = ({ user, userData, showNotification }) => {
     const [preferredName, setPreferredName] = useState(userData?.preferredName || '');
     const [pronouns, setPronouns] = useState(userData?.pronouns || '');
     const [avatarSeed, setAvatarSeed] = useState(userData?.avatarSeed || '');
-    const [avatarStyle, setAvatarStyle] = useState(userData?.avatarStyle || 'notionists');
     const [zodiac, setZodiac] = useState(userData?.zodiac || 'Aries');
     const [showInfo, setShowInfo] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -611,7 +614,7 @@ const Profile = ({ user, userData, showNotification }) => {
         showNotification('Saving...');
         const userDocRef = doc(db, "users", user.uid);
         try {
-            await updateDoc(userDocRef, { preferredName, pronouns, avatarSeed, avatarStyle, zodiac });
+            await updateDoc(userDocRef, { preferredName, pronouns, avatarSeed, zodiac });
             showNotification('Profile saved successfully!');
         } catch (error) {
             console.error("Error saving profile:", error);
@@ -708,7 +711,7 @@ const Profile = ({ user, userData, showNotification }) => {
                     <Modal onClose={() => setShowInfo(false)}>
                         <h2 className="text-2xl font-serif text-primary mb-4">About Avatar Seeds</h2>
                         <p className="text-foreground/90 mb-2">Your avatar is generated from a unique "seed" string. Any text can be a seed: your name, a favorite word, or just random characters.</p>
-                        <p className="text-foreground/90 mb-4">Changing the seed will create a completely new avatar. Explore different styles for even more variety!</p>
+                        <p className="text-foreground/90 mb-4">Changing the seed will create a completely new avatar. The DiceBear 'Notionists' style allows for an almost limitless number of unique combinations, so your avatar can be truly unique!</p>
                         <Button onClick={() => setShowInfo(false)} className="w-full">Got it</Button>
                     </Modal>
                 )}
@@ -733,7 +736,7 @@ const Profile = ({ user, userData, showNotification }) => {
             <h2 className="text-3xl font-serif mb-6 text-foreground text-center">Profile & Settings</h2>
 
             <div className="flex flex-col items-center mb-6">
-                <img src={API_ENDPOINTS.avatar(avatarSeed, avatarStyle)} alt="avatar" className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-primary/40 mb-4" />
+                <img src={API_ENDPOINTS.avatar(avatarSeed, userData?.avatarStyle)} alt="avatar" className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-primary/40 mb-4" />
                 <div className="w-full space-y-4">
                     <div>
                         <label className="text-foreground/80 mb-2 block text-sm">Username</label>
@@ -765,7 +768,7 @@ const Profile = ({ user, userData, showNotification }) => {
                          <label htmlFor="avatarSeed" className="text-foreground/80 mb-2 flex items-center text-sm">Avatar Seed <Info size={14} className="ml-2 cursor-pointer" onClick={() => setShowInfo(true)}/></label>
                         <input id="avatarSeed" type="text" value={avatarSeed} onChange={(e) => setAvatarSeed(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors" placeholder="Enter anything here" disabled={user.isAnonymous}/>
                     </div>
-                     <div>
+                    <div>
                          <label htmlFor="avatarStyle" className="text-foreground/80 mb-2 block text-sm">Avatar Style</label>
                         <select id="avatarStyle" value={avatarStyle} onChange={(e) => setAvatarStyle(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors appearance-none" disabled={user.isAnonymous}>
                             {avatarStyles.map(style => <option key={style} value={style}>{style}</option>)}
@@ -898,7 +901,7 @@ const CommunityHub = ({ user, userData, setChattingWith, showNotification }) => 
     ]
 
     return (
-        <div className="px-2 sm:px-6 max-w-4xl mx-auto">
+        <div className="p-2 sm:p-6 max-w-4xl mx-auto">
             <h2 className="text-3xl font-serif mb-6 text-center text-foreground">Community Hub</h2>
             
             <div className="sm:hidden mb-6">
@@ -949,7 +952,7 @@ const AffirmationWall = ({ user, userData, setNotification }) => {
             setIsLoading(false);
         });
         return () => unsubscribe();
-    }, [db]);
+    }, []);
 
     const handlePostAffirmation = async (e) => {
         e.preventDefault();
@@ -1077,32 +1080,13 @@ const FriendsList = ({ user, userData, setNotification, setChattingWith }) => {
         } finally {
             setLoading(false);
         }
-    }, [userData, setNotification, db]);
+    }, [userData, setNotification]);
 
     useEffect(() => {
         fetchFriendsAndRequests();
     }, [userData, fetchFriendsAndRequests]);
 
-    const handleRemoveFriend = async (friendUid) => {
-        if (!window.confirm("Are you sure you want to remove this friend?")) return;
-        
-        const batch = writeBatch(db);
-        const currentUserRef = doc(db, "users", user.uid);
-        const friendUserRef = doc(db, "users", friendUid);
-
-        batch.update(currentUserRef, { friends: arrayRemove(friendUid) });
-        batch.update(friendUserRef, { friends: arrayRemove(user.uid) });
-        
-        try {
-            await batch.commit();
-            setNotification("Friend removed successfully.");
-        } catch (error) {
-            console.error("Error removing friend:", error);
-            setNotification("Failed to remove friend.", "error");
-        }
-    };
-    
-    const UserCard = ({ profile, onRemove, onChat }) => (
+    const UserCard = ({ profile, children }) => (
         <div className="bg-background p-3 rounded-lg flex items-center justify-between">
             <div className="flex items-center space-x-3">
                 <img src={API_ENDPOINTS.avatar(profile.avatarSeed, profile.avatarStyle)} alt="avatar" className="w-10 h-10 rounded-full" />
@@ -1111,10 +1095,7 @@ const FriendsList = ({ user, userData, setNotification, setChattingWith }) => {
                     <p className="text-sm text-foreground/60">@{profile.username}</p>
                 </div>
             </div>
-            <div className="flex space-x-2">
-                 <button onClick={() => onChat(profile)} className="p-2 bg-primary/20 text-primary rounded-full hover:bg-primary/40"><MessageSquare size={16}/></button>
-                 <button onClick={() => onRemove(profile.uid)} className="p-2 bg-red-500/20 text-red-400 rounded-full hover:bg-red-500/40"><UserPlus size={16}/></button>
-            </div>
+            <div>{children}</div>
         </div>
     );
 
@@ -1127,7 +1108,9 @@ const FriendsList = ({ user, userData, setNotification, setChattingWith }) => {
                     {friends.length > 0 ? (
                         <div className="space-y-2">
                             {friends.map(friend => (
-                                <UserCard key={friend.uid} profile={friend} onChat={setChattingWith} onRemove={handleRemoveFriend}/>
+                                <UserCard key={friend.uid} profile={friend}>
+                                    <button onClick={() => setChattingWith(friend)} className="p-2 bg-primary/20 text-primary rounded-full hover:bg-primary/40"><MessageSquare size={16}/></button>
+                                </UserCard>
                             ))}
                         </div>
                     ) : (
@@ -1163,7 +1146,7 @@ const Notifications = ({ user, userData, setNotification }) => {
         } finally {
             setLoading(false);
         }
-    }, [userData, setNotification, db]);
+    }, [userData, setNotification]);
 
     useEffect(() => {
         fetchRequests();
@@ -1268,11 +1251,6 @@ const FindFriends = ({ user, userData, setNotification }) => {
     };
 
     const handleSendRequest = async (targetUid) => {
-        if (!userData) {
-            setNotification("Your user data isn't loaded yet. Please wait.", "error");
-            return;
-        }
-        
         const batch = writeBatch(db);
         const currentUserRef = doc(db, "users", user.uid);
         const targetUserRef = doc(db, "users", targetUid);
@@ -1356,7 +1334,7 @@ const ChatView = ({ user, friend, onBack }) => {
         });
 
         return () => unsubscribe();
-    }, [user.uid, friend.uid, db]);
+    }, [user.uid, friend.uid]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1379,8 +1357,19 @@ const ChatView = ({ user, friend, onBack }) => {
     };
 
     return (
-        <div className="flex flex-col h-full">
-            <div className="flex-grow overflow-y-auto p-4 space-y-4">
+        <div className="p-4 sm:p-6 max-w-4xl mx-auto h-[calc(100vh-150px)] flex flex-col">
+            <div className="flex items-center mb-4">
+                <button onClick={onBack} className="p-2 mr-2 rounded-full hover:bg-foreground/10 transition-colors">
+                    <ArrowLeft className="text-foreground/70" size={20}/>
+                </button>
+                <img src={API_ENDPOINTS.avatar(friend.avatarSeed, friend.avatarStyle)} alt="avatar" className="w-10 h-10 rounded-full mr-3" />
+                <div>
+                    <h2 className="text-xl font-bold text-foreground">{friend.preferredName}</h2>
+                    <p className="text-sm text-foreground/60">@{friend.username}</p>
+                </div>
+            </div>
+
+            <div className="flex-grow bg-card border border-border rounded-2xl p-4 overflow-y-auto mb-4 space-y-4">
                 {messages.map(msg => (
                     <div key={msg.id} className={`flex items-end gap-2 ${msg.senderId === user.uid ? 'justify-end' : 'justify-start'}`}>
                         {msg.senderId !== user.uid && <img src={API_ENDPOINTS.avatar(friend.avatarSeed, friend.avatarStyle)} className="w-6 h-6 rounded-full" alt="friend avatar"/>}
@@ -1392,7 +1381,7 @@ const ChatView = ({ user, friend, onBack }) => {
                 <div ref={messagesEndRef} />
             </div>
 
-            <form onSubmit={handleSendMessage} className="flex-shrink-0 p-4 bg-card border-t border-border flex space-x-2">
+            <form onSubmit={handleSendMessage} className="flex space-x-2">
                 <input
                     type="text"
                     value={newMessage}
@@ -1503,7 +1492,7 @@ const App = () => {
     };
 
     const pageTransition = { type: "tween", ease: "anticipate", duration: 0.4 };
-    
+
     const ChatWrapper = ({ user, friend, onBack }) => {
         return (
             <div className="h-screen flex flex-col">
@@ -1512,7 +1501,7 @@ const App = () => {
             </div>
         )
     };
-
+    
     const CurrentView = () => {
         if (user && !user.isAnonymous && userData && userData.needsSetup) {
             return <AccountSetup user={user} db={db} onSetupComplete={() => {}} />;
@@ -1557,15 +1546,7 @@ const App = () => {
             {!(userData && userData.needsSetup) && !chattingWith && <Header userData={userData} onLogout={handleLogout} onLogoClick={navigateToRoot} onAvatarClick={() => navigate('profile')} onBack={back} canGoBack={canGoBack} />}
             <main className={chattingWith ? "h-screen" : "pb-24 md:pb-4"}>
                 <AnimatePresence initial={false} mode="wait">
-                    <motion.div 
-                        key={currentView + (userData?.needsSetup ? 'setup' : '') + (chattingWith ? chattingWith.uid : '')}
-                        initial="initial"
-                        animate="in"
-                        exit="out"
-                        variants={pageVariants}
-                        transition={pageTransition}
-                        className={chattingWith ? "h-full" : ""}
-                    >
+                    <motion.div key={currentView + (userData?.needsSetup ? 'setup' : '') + (chattingWith ? chattingWith.uid : '')} initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition} className={chattingWith ? "h-full" : ""}>
                         <CurrentView />
                     </motion.div>
                 </AnimatePresence>

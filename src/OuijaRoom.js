@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { doc, setDoc, updateDoc, arrayUnion, collection, query, where, onSnapshot, serverTimestamp, runTransaction } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Plus, LogOut, Crown, Ghost } from 'lucide-react';
+import { Users, Plus, LogOut, Crown } from 'lucide-react';
 import { API_ENDPOINTS } from './App';
 
 const spiritResponses = [
@@ -15,121 +15,90 @@ const spiritResponses = [
 
 const OuijaBoard = ({ room, user, db }) => {
     const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890".split('');
-    const planchetteRef = useRef(null);
-    const boardRef = useRef(null);
+    const [animatedMessage, setAnimatedMessage] = useState('');
 
     useEffect(() => {
-        if (!db || room.gamePhase !== 'session' || !room.guidingMessage) {
-            if (planchetteRef.current) {
-                planchetteRef.current.style.transition = 'transform 1s ease-in-out';
-            }
+        if (room.gamePhase !== 'session' || !room.guidingMessage) {
+            setAnimatedMessage(room.currentMessage || '');
             return;
-        };
-
-        const targetChar = room.guidingMessage[room.guidingMessageIndex || 0];
-        if (!targetChar) return;
-
-        let targetElement;
-        if (targetChar === ' ') {
-            // For spaces, we can target a neutral element like the board itself for a pause
-            targetElement = boardRef.current; 
-        } else {
-            targetElement = document.getElementById(`char-${targetChar.toUpperCase()}`);
         }
 
-        if (!targetElement || !boardRef.current || !planchetteRef.current) return;
+        const interval = setInterval(() => {
+            setAnimatedMessage(prev => {
+                const nextCharIndex = prev.length;
+                if (nextCharIndex < room.guidingMessage.length) {
+                    return room.guidingMessage.substring(0, nextCharIndex + 1);
+                }
+                clearInterval(interval);
+                return prev;
+            });
+        }, 800); // Slower reveal for suspense
 
-        const boardRect = boardRef.current.getBoundingClientRect();
-        const targetRect = targetElement.getBoundingClientRect();
-        
-        let targetX, targetY;
+        return () => clearInterval(interval);
 
-        if (targetChar === ' ') {
-            // Pause in the center for a space
-            targetX = boardRect.width / 2 - (planchetteRef.current.offsetWidth / 2);
-            targetY = boardRect.height / 2 - (planchetteRef.current.offsetHeight / 2);
-        } else {
-            targetX = targetRect.left + targetRect.width / 2 - boardRect.left - (planchetteRef.current.offsetWidth / 2);
-            targetY = targetRect.top + targetRect.height / 2 - boardRect.top - (planchetteRef.current.offsetHeight / 2);
-        }
-
-        planchetteRef.current.style.transition = 'transform 1s cubic-bezier(0.4, 0, 0.2, 1)';
-        planchetteRef.current.style.transform = `translate(${targetX}px, ${targetY}px)`;
-
-        if (room.host.uid === user.uid) {
+    }, [room.gamePhase, room.guidingMessage, room.currentMessage]);
+    
+    useEffect(() => {
+        if (room.host.uid === user.uid && room.gamePhase === 'session' && animatedMessage.length === room.guidingMessage.length) {
             const timeoutId = setTimeout(async () => {
                 const roomRef = doc(db, 'ouijaRooms', room.id);
-                const nextIndex = (room.guidingMessageIndex || 0) + 1;
-
-                if (nextIndex >= room.guidingMessage.length) {
-                    await updateDoc(roomRef, {
-                        gamePhase: 'idle',
-                        currentMessage: room.guidingMessage,
-                        guidingMessage: '',
-                        guidingMessageIndex: 0,
-                        focusMessages: [],
-                        votes: {},
-                        ready: {}
-                    });
-                } else {
-                    await updateDoc(roomRef, { guidingMessageIndex: nextIndex });
-                }
-            }, 1200); // 1s travel time + 200ms hover/pause
+                await updateDoc(roomRef, { 
+                    gamePhase: 'idle',
+                    currentMessage: room.guidingMessage,
+                    guidingMessage: '', 
+                    focusMessages: [],
+                    votes: {},
+                    ready: {}
+                });
+            }, 2000); // Pause at the end of the message
             return () => clearTimeout(timeoutId);
         }
-
-    }, [room.gamePhase, room.guidingMessage, room.guidingMessageIndex, room.host.uid, user.uid, room.id, db]);
-
+    }, [animatedMessage, room, user, db]);
 
     return (
-        <div ref={boardRef} className="relative w-full max-w-3xl mx-auto bg-slate-900/50 p-4 sm:p-8 rounded-3xl shadow-2xl border-2 border-purple-500/30 select-none aspect-[16/10] flex flex-col justify-center">
-            <div className="absolute top-4 sm:top-8 left-6 sm:left-12 text-xl sm:text-2xl font-serif text-primary" id="char-YES">YES</div>
-            <div className="absolute top-4 sm:top-8 right-6 sm:right-12 text-xl sm:text-2xl font-serif text-primary" id="char-NO">NO</div>
+        <div className="relative w-full max-w-3xl mx-auto bg-slate-900/50 p-4 sm:p-8 rounded-3xl shadow-2xl border-2 border-purple-500/30 select-none aspect-[16/10] flex flex-col justify-center">
+            <div className="absolute top-4 sm:top-8 left-6 sm:left-12 text-xl sm:text-2xl font-serif text-primary">YES</div>
+            <div className="absolute top-4 sm:top-8 right-6 sm:right-12 text-xl sm:text-2xl font-serif text-primary">NO</div>
 
             <div className="flex flex-wrap justify-center items-center gap-x-2 sm:gap-x-3 gap-y-1 sm:gap-y-2 px-4 sm:px-16">
-                {characters.map(char => (
-                    <span key={char} id={`char-${char}`} className="text-lg sm:text-2xl font-serif text-purple-200/90 transition-colors">{char}</span>
-                ))}
+                {characters.map(char => {
+                    const isLastChar = animatedMessage[animatedMessage.length - 1] === char;
+                    return (
+                        <motion.span
+                            key={char}
+                            className="text-lg sm:text-2xl font-serif text-purple-200/90 transition-colors"
+                            animate={{
+                                color: isLastChar ? '#fff' : '#c4b5fd',
+                                scale: isLastChar ? 1.5 : 1,
+                                textShadow: isLastChar ? '0 0 15px #a78bfa' : 'none'
+                            }}
+                            transition={{ duration: 0.3, ease: 'easeOut' }}
+                        >
+                            {char}
+                        </motion.span>
+                    )
+                })}
             </div>
 
-            <div className="absolute bottom-4 sm:bottom-8 left-1/2 -translate-x-1/2 text-xl sm:text-2xl font-serif text-primary" id="char-GOODBYE">GOODBYE</div>
+            <div className="absolute bottom-4 sm:bottom-8 left-1/2 -translate-x-1/2 text-xl sm:text-2xl font-serif text-primary">GOODBYE</div>
 
             <div className="absolute bottom-[20%] left-1/2 -translate-x-1/2 w-4/5 h-12 sm:h-16 bg-black/30 rounded-lg p-2 text-center text-white font-serif text-base sm:text-xl overflow-y-auto flex items-center justify-center">
                 <AnimatePresence>
-                {room.guidingMessage.substring(0, room.guidingMessageIndex || 0).split('').map((char, i) => (
-                    <motion.span
-                        key={i}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ duration: 0.5 }}
-                    >
-                        {char}
-                    </motion.span>
-                ))}
+                    {animatedMessage.split('').map((char, i) => (
+                        <motion.span
+                            key={i}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.5 }}
+                        >
+                            {char === ' ' ? '\u00A0' : char}
+                        </motion.span>
+                    ))}
                 </AnimatePresence>
-                {room.gamePhase !== 'session' && <p>{room.currentMessage}</p>}
             </div>
-
-            <motion.div
-                ref={planchetteRef}
-                className="absolute"
-                style={{ top: '50%', left: '50%', x: '-50%', y: '-50%' }}
-                animate={{
-                    filter: room.gamePhase === 'session' ? ['brightness(1)', 'brightness(1.8)', 'brightness(1)'] : 'brightness(1)',
-                    scale: room.gamePhase === 'session' ? [1, 1.1, 1] : 1,
-                }}
-                transition={{
-                    duration: 1.2,
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                }}
-            >
-                 <Ghost className="w-14 h-14 sm:w-16 sm:h-16 text-white drop-shadow-lg" />
-            </motion.div>
         </div>
     );
 };
-
 const RoomLobby = ({ onJoinRoom, db, user, userData, setNotification }) => {
     const [rooms, setRooms] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -410,7 +379,6 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
             updateDoc(roomRef, {
                 gamePhase: 'session',
                 guidingMessage: spiritResponse.toUpperCase(),
-                guidingMessageIndex: 0
             });
         }
 
@@ -429,7 +397,7 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
                         spiritResponse = spiritResponses[Math.floor(Math.random() * spiritResponses.length)];
                     } while (spiritResponse === currentRoom.currentMessage);
 
-                    updateDoc(roomRef, { gamePhase: 'session', guidingMessage: spiritResponse.toUpperCase(), guidingMessageIndex: 0 });
+                    updateDoc(roomRef, { gamePhase: 'session', guidingMessage: spiritResponse.toUpperCase() });
                  }
             }
         }
@@ -560,4 +528,5 @@ const OuijaRoom = ({ user, userData, onBack, db }) => {
         </div>
     );
 };
+
 export default OuijaRoom;
