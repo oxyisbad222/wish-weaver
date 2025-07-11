@@ -3,7 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, signInAnonymously, deleteUser } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove, collection, query, where, getDocs, writeBatch, serverTimestamp, onSnapshot, orderBy, limit, addDoc, deleteDoc, runTransaction } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle, Info, Users, MessageSquare, Sparkles, UserPlus, Send, Check, X, Trash2, Flag, Bell, Edit, Save, XCircle } from 'lucide-react';
+import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle, Info, Users, MessageSquare, Sparkles, UserPlus, Send, Check, X, Trash2, Flag, Bell, Edit, Save, XCircle, ChevronDown } from 'lucide-react';
 import AccountSetup from './AccountSetup';
 import OuijaRoom from './OuijaRoom';
 
@@ -405,22 +405,25 @@ const CelticCrossLayout = ({ cards, onCardClick }) => {
     ];
 
     return (
-        <div className="w-full max-w-xl mx-auto p-4 grid grid-cols-4 sm:grid-cols-10 gap-2 sm:gap-4" style={{ gridTemplateRows: 'repeat(4, auto)' }}>
-            <div className="col-start-2 sm:col-start-4 sm:row-start-2"><CardDisplay card={cards[0]} positionLabel={positions[0]} onCardClick={onCardClick} /></div>
-            <div className="col-start-2 sm:col-start-4 sm:row-start-2 -rotate-90"><CardDisplay card={cards[1]} positionLabel={positions[1]} onCardClick={onCardClick} /></div>
+        <div className="w-full max-w-md mx-auto p-2 grid grid-cols-4 gap-2">
+            {/* The Cross */}
+            <div className="col-start-2 row-start-2"><CardDisplay card={cards[0]} positionLabel={positions[0]} onCardClick={onCardClick} /></div>
+            <div className="col-start-2 row-start-2 -rotate-90"><CardDisplay card={cards[1]} positionLabel={positions[1]} onCardClick={onCardClick} /></div>
             
-            <div className="col-start-3 sm:col-start-5 sm:row-start-2"><CardDisplay card={cards[4]} positionLabel={positions[4]} onCardClick={onCardClick} /></div>
-            <div className="col-start-1 sm:col-start-3 sm:row-start-2"><CardDisplay card={cards[3]} positionLabel={positions[3]} onCardClick={onCardClick} /></div>
-            <div className="col-start-2 sm:col-start-4 sm:row-start-3"><CardDisplay card={cards[2]} positionLabel={positions[2]} onCardClick={onCardClick} /></div>
-            <div className="col-start-2 sm:col-start-4 sm:row-start-1"><CardDisplay card={cards[5]} positionLabel={positions[5]} onCardClick={onCardClick} /></div>
+            <div className="col-start-3 row-start-2"><CardDisplay card={cards[4]} positionLabel={positions[4]} onCardClick={onCardClick} /></div>
+            <div className="col-start-1 row-start-2"><CardDisplay card={cards[3]} positionLabel={positions[3]} onCardClick={onCardClick} /></div>
+            <div className="col-start-2 row-start-3"><CardDisplay card={cards[2]} positionLabel={positions[2]} onCardClick={onCardClick} /></div>
+            <div className="col-start-2 row-start-1"><CardDisplay card={cards[5]} positionLabel={positions[5]} onCardClick={onCardClick} /></div>
 
-            <div className="col-start-4 sm:col-start-7 sm:row-start-4"><CardDisplay card={cards[6]} positionLabel={positions[6]} onCardClick={onCardClick} /></div>
-            <div className="col-start-4 sm:col-start-7 sm:row-start-3"><CardDisplay card={cards[7]} positionLabel={positions[7]} onCardClick={onCardClick} /></div>
-            <div className="col-start-4 sm:col-start-7 sm:row-start-2"><CardDisplay card={cards[8]} positionLabel={positions[8]} onCardClick={onCardClick} /></div>
-            <div className="col-start-4 sm:col-start-7 sm:row-start-1"><CardDisplay card={cards[9]} positionLabel={positions[9]} onCardClick={onCardClick} /></div>
+            {/* The Staff */}
+            <div className="col-start-4 row-start-4"><CardDisplay card={cards[6]} positionLabel={positions[6]} onCardClick={onCardClick} /></div>
+            <div className="col-start-4 row-start-3"><CardDisplay card={cards[7]} positionLabel={positions[7]} onCardClick={onCardClick} /></div>
+            <div className="col-start-4 row-start-2"><CardDisplay card={cards[8]} positionLabel={positions[8]} onCardClick={onCardClick} /></div>
+            <div className="col-start-4 row-start-1"><CardDisplay card={cards[9]} positionLabel={positions[9]} onCardClick={onCardClick} /></div>
         </div>
     );
 };
+
 
 const TarotReading = ({ user, showNotification }) => {
     const [fullDeck, setFullDeck] = useState([]);
@@ -894,7 +897,7 @@ const CommunityHub = ({ user, userData, setChattingWith, showNotification }) => 
             {count > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">{count}</span>}
         </button>
     );
-
+    
     const communitySections = [
         {name: 'affirmations', label: "Affirmations"},
         {name: 'friends', label: "Friends"},
@@ -1088,7 +1091,7 @@ const FriendsList = ({ user, userData, setNotification, setChattingWith }) => {
     useEffect(() => {
         fetchFriendsAndRequests();
     }, [userData, fetchFriendsAndRequests]);
-
+    
     const handleRemoveFriend = async (friendUid) => {
         if (!window.confirm("Are you sure you want to remove this friend?")) return;
         
@@ -1108,7 +1111,7 @@ const FriendsList = ({ user, userData, setNotification, setChattingWith }) => {
         }
     };
 
-    const UserCard = ({ profile, children }) => (
+    const UserCard = ({ profile, children, onRemove }) => (
         <div className="bg-background p-3 rounded-lg flex items-center justify-between">
             <div className="flex items-center space-x-3">
                 <img src={API_ENDPOINTS.avatar(profile.avatarSeed, profile.avatarStyle)} alt="avatar" className="w-10 h-10 rounded-full" />
@@ -1117,7 +1120,10 @@ const FriendsList = ({ user, userData, setNotification, setChattingWith }) => {
                     <p className="text-sm text-foreground/60">@{profile.username}</p>
                 </div>
             </div>
-            <div>{children}</div>
+            <div className="flex space-x-2">
+                 {children}
+                 <button onClick={() => onRemove(profile.uid)} className="p-2 bg-red-500/20 text-red-400 rounded-full hover:bg-red-500/40"><X size={16}/></button>
+            </div>
         </div>
     );
 
@@ -1130,7 +1136,7 @@ const FriendsList = ({ user, userData, setNotification, setChattingWith }) => {
                     {friends.length > 0 ? (
                         <div className="space-y-2">
                             {friends.map(friend => (
-                                <UserCard key={friend.uid} profile={friend}>
+                                <UserCard key={friend.uid} profile={friend} onRemove={handleRemoveFriend}>
                                     <button onClick={() => setChattingWith(friend)} className="p-2 bg-primary/20 text-primary rounded-full hover:bg-primary/40"><MessageSquare size={16}/></button>
                                 </UserCard>
                             ))}
@@ -1273,6 +1279,11 @@ const FindFriends = ({ user, userData, setNotification }) => {
     };
 
     const handleSendRequest = async (targetUid) => {
+        if (!userData) {
+            setNotification("Your user data isn't loaded yet. Please wait.", "error");
+            return;
+        }
+        
         const batch = writeBatch(db);
         const currentUserRef = doc(db, "users", user.uid);
         const targetUserRef = doc(db, "users", targetUid);
@@ -1514,8 +1525,8 @@ const App = () => {
     };
 
     const CurrentView = () => {
-        if (user && !user.isAnonymous && userData && userData.needsSetup) {
-            return <AccountSetup user={user} db={db} onSetupComplete={() => {}} />;
+        if (user && userData && userData.needsSetup) {
+            return <AccountSetup user={user} db={db} onSetupComplete={() => navigate('dashboard')} />;
         }
         
         if (chattingWith) {
@@ -1538,7 +1549,7 @@ const App = () => {
         }
     };
 
-    if (loadingAuth) {
+    if (loadingAuth || (user && !user.isAnonymous && !userData)) {
         return <LoadingSpinner />;
     }
 
@@ -1556,7 +1567,7 @@ const App = () => {
             <Notification message={notification.message} type={notification.type} />
             {!(userData && userData.needsSetup) && !chattingWith && <Header userData={userData} onLogout={handleLogout} onLogoClick={navigateToRoot} onAvatarClick={() => navigate('profile')} onBack={back} canGoBack={canGoBack} />}
             <main className={chattingWith ? "h-screen" : "pb-24 md:pb-4"}>
-                <AnimatePresence initial={false} mode="wait">
+                <AnimatePresence mode="wait">
                     <motion.div key={currentView + (userData?.needsSetup ? 'setup' : '') + (chattingWith ? chattingWith.uid : '')} initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition} className={chattingWith ? "h-full" : ""}>
                         <CurrentView />
                     </motion.div>

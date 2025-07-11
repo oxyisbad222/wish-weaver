@@ -1,11 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { doc, updateDoc, collection, query, where, getDocs, writeBatch } from "firebase/firestore";
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, XCircle, Loader, Shuffle } from 'lucide-react';
-
-const API_ENDPOINTS = {
-    avatar: (seed) => `https://api.dicebear.com/8.x/notionists/svg?seed=${seed}&backgroundColor=f0e7f7,e0f0e9,d1d4f9`
-};
+import { API_ENDPOINTS } from './App';
 
 const Button = ({ onClick, children, variant = 'primary', className = '', disabled = false, type = 'button' }) => {
   const baseClasses = 'font-semibold py-3 px-6 rounded-lg transition-all duration-300 ease-in-out transform flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed';
@@ -35,6 +32,7 @@ const AccountSetup = ({ user, db, onSetupComplete }) => {
     const [pronouns, setPronouns] = useState('');
     const [zodiac, setZodiac] = useState('Aries');
     const [avatarSeed, setAvatarSeed] = useState(user.uid);
+    const [avatarStyle] = useState('notionists'); // Default style
     const [error, setError] = useState('');
 
     const zodiacSigns = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
@@ -103,13 +101,18 @@ const AccountSetup = ({ user, db, onSetupComplete }) => {
             const userDocRef = doc(db, "users", user.uid);
             const usernameDocRef = doc(db, "usernames", username);
 
-            batch.set(usernameDocRef, { uid: user.uid, username: username });
+            batch.set(usernameDocRef, { uid: user.uid });
             batch.update(userDocRef, {
                 username,
                 preferredName,
                 pronouns,
                 zodiac,
                 avatarSeed,
+                avatarStyle,
+                friends: [],
+                friendRequestsSent: [],
+                friendRequestsReceived: [],
+                readings: [],
                 needsSetup: false,
             });
 
@@ -174,7 +177,7 @@ const AccountSetup = ({ user, db, onSetupComplete }) => {
                     <motion.div key={3} initial={{opacity: 0, x: 50}} animate={{opacity: 1, x: 0}} exit={{opacity: 0, x: -50}}>
                          <h2 className="text-2xl font-serif text-center mb-4 text-foreground">Customize Your Avatar</h2>
                          <div className="flex justify-center mb-4">
-                            <img src={API_ENDPOINTS.avatar(avatarSeed)} alt="Your Avatar" className="w-24 h-24 rounded-full border-4 border-primary/40"/>
+                            <img src={API_ENDPOINTS.avatar(avatarSeed, avatarStyle)} alt="Your Avatar" className="w-24 h-24 rounded-full border-4 border-primary/40"/>
                         </div>
                         <div>
                             <label htmlFor="avatarSeed" className="text-foreground/80 mb-1 block text-sm">Avatar Seed</label>
