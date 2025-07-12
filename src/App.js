@@ -31,10 +31,10 @@ const useNavigation = (initialView = 'dashboard') => {
     const [history, setHistory] = useState([initialView]);
     const direction = useRef(1);
 
-    const navigate = (newView) => {
+    const navigate = (newView, data = null) => {
         if (newView === history[history.length - 1]) return;
         direction.current = 1;
-        setHistory(prev => [...prev, newView]);
+        setHistory(prev => [...prev, { view: newView, data }]);
     };
 
     const back = () => {
@@ -43,17 +43,19 @@ const useNavigation = (initialView = 'dashboard') => {
             setHistory(prev => prev.slice(0, -1));
         }
     };
-    
+
     const navigateToRoot = () => {
         if (history.length <= 1) return;
         direction.current = -1;
-        setHistory(['dashboard']);
+        setHistory([{ view: 'dashboard', data: null }]);
     };
 
-    const currentView = history[history.length - 1];
+    const currentRoute = history[history.length - 1];
+    const currentView = typeof currentRoute === 'string' ? currentRoute : currentRoute.view;
+    const currentData = typeof currentRoute === 'string' ? null : currentRoute.data;
     const canGoBack = history.length > 1;
 
-    return { navigate, back, navigateToRoot, currentView, canGoBack, direction: direction.current };
+    return { navigate, back, navigateToRoot, currentView, currentData, canGoBack, direction: direction.current };
 };
 
 const getInsightfulMeaning = (card, position, isReversed) => {
@@ -565,7 +567,7 @@ const TarotReading = ({ user, showNotification }) => {
                         <h2 className="text-2xl font-serif text-primary mb-4">How to Read the Celtic Cross</h2>
                         <div className="space-y-2 text-foreground/90 text-sm">
                             <p><strong>1. The Heart of the Matter:</strong> Represents the core of the situation.</p>
-                            <p><strong>2. The Obstacle:</strong> The immediate challenge or conflict.</p>
+                            <p><strong>2. The Obstacle:</strong> This card is placed sideways, crossing over the first card, to represent the immediate challenge.</p>
                             <p><strong>3. The Foundation:</strong> The subconscious influences and past events.</p>
                             <p><strong>4. The Recent Past:</strong> Events that have just occurred.</p>
                             <p><strong>5. The Crown:</strong> The best possible outcome or potential.</p>
@@ -589,7 +591,7 @@ const TarotReading = ({ user, showNotification }) => {
 
             {cards && cards.length > 0 && (
                 <div className="max-w-5xl mx-auto">
-                    {spreadType === 'celtic-cross' && (
+                     {spreadType === 'celtic-cross' && (
                         <div className="flex justify-center items-center mb-4">
                             <button onClick={() => setShowInfoModal(true)} className="flex items-center space-x-2 text-sm text-primary hover:underline">
                                 <Info size={16}/>
@@ -833,7 +835,7 @@ const Profile = ({ user, userData, showNotification }) => {
     );
 };
 
-const PastReadings = ({ user, userData, showNotification }) => {
+const PastReadings = ({ user, userData, showNotification, onCardClick }) => {
     const [expandedReading, setExpandedReading] = useState(null);
     const [editingNote, setEditingNote] = useState('');
 
@@ -904,7 +906,7 @@ const PastReadings = ({ user, userData, showNotification }) => {
                                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-4">
                                             {reading.cards.map((cardData, cardIndex) => (
                                                 <div key={cardIndex}>
-                                                    <img src={`${API_ENDPOINTS.tarotImageBase}${cardData.img}`} alt={cardData.name} className="rounded-lg shadow-sm" />
+                                                    <CardDisplay card={cardData} onCardClick={onCardClick}/>
                                                 </div>
                                             ))}
                                         </div>
@@ -924,7 +926,7 @@ const PastReadings = ({ user, userData, showNotification }) => {
     );
 };
 
-const CommunityHub = ({ user, userData, setChattingWith, showNotification }) => {
+const CommunityHub = ({ user, userData, setChattingWith, showNotification, onProfileClick }) => {
     const [activeTab, setActiveTab] = useState('affirmations');
 
     const TabButton = ({ tabName, label, count }) => (
@@ -970,17 +972,17 @@ const CommunityHub = ({ user, userData, setChattingWith, showNotification }) => 
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2 }}
                 >
-                    {activeTab === 'affirmations' && <AffirmationWall user={user} userData={userData} setNotification={showNotification} />}
-                    {activeTab === 'friends' && <FriendsList user={user} userData={userData} setNotification={showNotification} setChattingWith={setChattingWith} />}
-                    {activeTab === 'notifications' && <Notifications user={user} userData={userData} setNotification={showNotification} />}
-                    {activeTab === 'find' && <FindFriends user={user} userData={userData} setNotification={showNotification} />}
+                    {activeTab === 'affirmations' && <AffirmationWall user={user} userData={userData} setNotification={showNotification} onProfileClick={onProfileClick} />}
+                    {activeTab === 'friends' && <FriendsList user={user} userData={userData} setNotification={showNotification} setChattingWith={setChattingWith} onProfileClick={onProfileClick}/>}
+                    {activeTab === 'notifications' && <Notifications user={user} userData={userData} setNotification={showNotification} onProfileClick={onProfileClick}/>}
+                    {activeTab === 'find' && <FindFriends user={user} userData={userData} setNotification={showNotification} onProfileClick={onProfileClick}/>}
                 </motion.div>
             </AnimatePresence>
         </div>
     );
 };
 
-const AffirmationWall = ({ user, userData, setNotification }) => {
+const AffirmationWall = ({ user, userData, setNotification, onProfileClick }) => {
     const [affirmations, setAffirmations] = useState([]);
     const [newAffirmation, setNewAffirmation] = useState('');
     const [isLoading, setIsLoading] = useState(true);
@@ -1082,9 +1084,9 @@ const AffirmationWall = ({ user, userData, setNotification }) => {
                 {isLoading && <p>Loading affirmations...</p>}
                 {affirmations.map(aff => (
                     <div key={aff.id} className="bg-background p-4 rounded-lg flex items-start space-x-4">
-                        <img src={API_ENDPOINTS.avatar(aff.authorAvatarSeed, aff.authorAvatarStyle)} alt="avatar" className="w-10 h-10 rounded-full border-2 border-primary/30" />
+                        <img onClick={() => onProfileClick(aff.authorId)} src={API_ENDPOINTS.avatar(aff.authorAvatarSeed, aff.authorAvatarStyle)} alt="avatar" className="w-10 h-10 rounded-full border-2 border-primary/30 cursor-pointer"/>
                         <div className="flex-grow">
-                            <p className="font-semibold text-foreground">@{aff.authorUsername}</p>
+                            <p onClick={() => onProfileClick(aff.authorId)} className="font-semibold text-foreground cursor-pointer">@{aff.authorUsername}</p>
                             <p className="text-foreground/90">{aff.text}</p>
                         </div>
                         <div className="flex-shrink-0">
@@ -1101,7 +1103,7 @@ const AffirmationWall = ({ user, userData, setNotification }) => {
     );
 };
 
-const FriendsList = ({ user, userData, setNotification, setChattingWith }) => {
+const FriendsList = ({ user, userData, setNotification, setChattingWith, onProfileClick }) => {
     const [friends, setFriends] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -1152,7 +1154,7 @@ const FriendsList = ({ user, userData, setNotification, setChattingWith }) => {
 
     const UserCard = ({ profile, children, onRemove }) => (
         <div className="bg-background p-3 rounded-lg flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3 cursor-pointer"  onClick={() => onProfileClick(profile.uid)}>
                 <img src={API_ENDPOINTS.avatar(profile.avatarSeed, profile.avatarStyle)} alt="avatar" className="w-10 h-10 rounded-full" />
                 <div>
                     <p className="font-semibold text-foreground">{profile.preferredName}</p>
@@ -1189,7 +1191,7 @@ const FriendsList = ({ user, userData, setNotification, setChattingWith }) => {
     );
 };
 
-const Notifications = ({ user, userData, setNotification }) => {
+const Notifications = ({ user, userData, setNotification, onProfileClick }) => {
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -1252,7 +1254,7 @@ const Notifications = ({ user, userData, setNotification }) => {
                         <div className="space-y-2">
                             {requests.map(req => (
                                 <div key={req.uid} className="bg-background p-3 rounded-lg flex items-center justify-between">
-                                    <div className="flex items-center space-x-3">
+                                    <div className="flex items-center space-x-3 cursor-pointer" onClick={() => onProfileClick(req.uid)}>
                                         <img src={API_ENDPOINTS.avatar(req.avatarSeed, req.avatarStyle)} alt="avatar" className="w-10 h-10 rounded-full" />
                                         <div>
                                             <p className="font-semibold text-foreground">{req.preferredName}</p>
@@ -1275,7 +1277,7 @@ const Notifications = ({ user, userData, setNotification }) => {
     );
 };
 
-const FindFriends = ({ user, userData, setNotification }) => {
+const FindFriends = ({ user, userData, setNotification, onProfileClick }) => {
     const [searchUsername, setSearchUsername] = useState('');
     const [searchResult, setSearchResult] = useState(null);
     const [isSearching, setIsSearching] = useState(false);
@@ -1359,7 +1361,7 @@ const FindFriends = ({ user, userData, setNotification }) => {
             
             {searchResult && (
                 <div className="bg-background p-3 rounded-lg flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-3 cursor-pointer" onClick={() => onProfileClick(searchResult.uid)}>
                         <img src={API_ENDPOINTS.avatar(searchResult.avatarSeed, searchResult.avatarStyle)} alt="avatar" className="w-10 h-10 rounded-full" />
                         <div>
                             <p className="font-semibold text-foreground">{searchResult.preferredName}</p>
@@ -1493,7 +1495,7 @@ const App = () => {
     const [loadingAuth, setLoadingAuth] = useState(true);
     const [chattingWith, setChattingWith] = useState(null);
     const [notification, setNotification] = useState({ message: '', type: 'success' });
-    const { navigate, back, navigateToRoot, currentView, canGoBack, direction } = useNavigation('dashboard');
+    const { navigate, back, navigateToRoot, currentView, currentData, canGoBack, direction } = useNavigation('dashboard');
 
     const showNotification = (message, type = 'success') => {
         setNotification({ message, type });
@@ -1557,6 +1559,20 @@ const App = () => {
             </div>
         )
     };
+    
+    const PublicProfileView = ({ profileData, onBack }) => (
+        <div className="p-4">
+             <button onClick={onBack} className="flex items-center space-x-2 text-primary mb-4"><ArrowLeft size={16}/><span>Back</span></button>
+            <div className="bg-card p-6 rounded-2xl shadow-lg max-w-md mx-auto text-center border border-border">
+                <img src={API_ENDPOINTS.avatar(profileData.avatarSeed, profileData.avatarStyle)} alt="avatar" className="w-32 h-32 rounded-full mx-auto border-4 border-primary/40 mb-4" />
+                <h2 className="text-2xl font-bold text-foreground">@{profileData.username}</h2>
+                {profileData.isNamePublic && <p className="text-xl text-foreground/80">{profileData.preferredName}</p>}
+                {profileData.isPronounsPublic && <p className="text-sm text-foreground/60">{profileData.pronouns}</p>}
+                {profileData.isZodiacPublic && <p className="text-sm text-foreground/60">{profileData.zodiac}</p>}
+                {profileData.isBioPublic && <p className="mt-4 text-foreground/90">{profileData.bio}</p>}
+            </div>
+        </div>
+    );
 
     const CurrentView = () => {
         if (user && userData && userData.needsSetup) {
@@ -1567,7 +1583,7 @@ const App = () => {
             return <ChatWrapper user={user} friend={chattingWith} onBack={() => setChattingWith(null)} />;
         }
 
-        if (userData?.isAnonymous && (currentView === 'community' || currentView === 'ouija' || currentView === 'past_readings' || currentView === 'profile')) {
+        if (userData?.isAnonymous && (currentView === 'community' || currentView === 'ouija' || currentView === 'past_readings' || currentView === 'profile' || currentView === 'public_profile')) {
             return <Dashboard navigate={navigate} userData={userData}/>;
         }
 
@@ -1576,8 +1592,9 @@ const App = () => {
             case 'horoscope': return <Horoscope zodiac={userData?.zodiac} />;
             case 'tarot': return <TarotReading user={user} showNotification={showNotification} />;
             case 'profile': return <Profile user={user} userData={userData} showNotification={showNotification} />;
-            case 'past_readings': return <PastReadings user={user} userData={userData} showNotification={showNotification} />;
-            case 'community': return <CommunityHub user={user} userData={userData} setChattingWith={setChattingWith} showNotification={showNotification} />;
+            case 'public_profile': return <PublicProfileView profileData={currentData} onBack={back} />;
+            case 'past_readings': return <PastReadings user={user} userData={userData} showNotification={showNotification} onCardClick={(card) => { console.log("Card clicked:", card)}} />;
+            case 'community': return <CommunityHub user={user} userData={userData} setChattingWith={setChattingWith} showNotification={showNotification} onProfileClick={(uid) => navigate('public_profile', { uid })}/>;
             case 'ouija': return <OuijaRoom user={user} userData={userData} onBack={back} db={db} />;
             default: return <Dashboard navigate={navigate} userData={userData}/>;
         }
