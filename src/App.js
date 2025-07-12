@@ -28,13 +28,13 @@ export const API_ENDPOINTS = {
 };
 
 const useNavigation = (initialView = 'dashboard') => {
-    const [history, setHistory] = useState([initialView]);
+    const [history, setHistory] = useState([{ view: initialView, data: null }]);
     const direction = useRef(1);
 
-    const navigate = (newView, data = null) => {
-        if (newView === history[history.length - 1]) return;
+    const navigate = (view, data = null) => {
+        if (view === history[history.length - 1].view) return;
         direction.current = 1;
-        setHistory(prev => [...prev, { view: newView, data }]);
+        setHistory(prev => [...prev, { view, data }]);
     };
 
     const back = () => {
@@ -43,7 +43,7 @@ const useNavigation = (initialView = 'dashboard') => {
             setHistory(prev => prev.slice(0, -1));
         }
     };
-
+    
     const navigateToRoot = () => {
         if (history.length <= 1) return;
         direction.current = -1;
@@ -51,11 +51,9 @@ const useNavigation = (initialView = 'dashboard') => {
     };
 
     const currentRoute = history[history.length - 1];
-    const currentView = typeof currentRoute === 'string' ? currentRoute : currentRoute.view;
-    const currentData = typeof currentRoute === 'string' ? null : currentRoute.data;
     const canGoBack = history.length > 1;
 
-    return { navigate, back, navigateToRoot, currentView, currentData, canGoBack, direction: direction.current };
+    return { navigate, back, navigateToRoot, currentRoute, canGoBack, direction: direction.current };
 };
 
 const getInsightfulMeaning = (card, position, isReversed) => {
@@ -1495,7 +1493,8 @@ const App = () => {
     const [loadingAuth, setLoadingAuth] = useState(true);
     const [chattingWith, setChattingWith] = useState(null);
     const [notification, setNotification] = useState({ message: '', type: 'success' });
-    const { navigate, back, navigateToRoot, currentView, currentData, canGoBack, direction } = useNavigation('dashboard');
+    const { navigate, back, navigateToRoot, currentRoute, canGoBack, direction } = useNavigation('dashboard');
+    const { view: currentView, data: currentData } = currentRoute;
 
     const showNotification = (message, type = 'success') => {
         setNotification({ message, type });
@@ -1560,19 +1559,43 @@ const App = () => {
         )
     };
     
-    const PublicProfileView = ({ profileData, onBack }) => (
-        <div className="p-4">
-             <button onClick={onBack} className="flex items-center space-x-2 text-primary mb-4"><ArrowLeft size={16}/><span>Back</span></button>
-            <div className="bg-card p-6 rounded-2xl shadow-lg max-w-md mx-auto text-center border border-border">
-                <img src={API_ENDPOINTS.avatar(profileData.avatarSeed, profileData.avatarStyle)} alt="avatar" className="w-32 h-32 rounded-full mx-auto border-4 border-primary/40 mb-4" />
-                <h2 className="text-2xl font-bold text-foreground">@{profileData.username}</h2>
-                {profileData.isNamePublic && <p className="text-xl text-foreground/80">{profileData.preferredName}</p>}
-                {profileData.isPronounsPublic && <p className="text-sm text-foreground/60">{profileData.pronouns}</p>}
-                {profileData.isZodiacPublic && <p className="text-sm text-foreground/60">{profileData.zodiac}</p>}
-                {profileData.isBioPublic && <p className="mt-4 text-foreground/90">{profileData.bio}</p>}
+    const PublicProfileView = ({ profileUid, onBack }) => {
+        const [profileData, setProfileData] = useState(null);
+        const [isLoading, setIsLoading] = useState(true);
+
+        useEffect(() => {
+            const fetchProfile = async () => {
+                setIsLoading(true);
+                const userDocRef = doc(db, 'users', profileUid);
+                const userDoc = await getDoc(userDocRef);
+                if (userDoc.exists()) {
+                    setProfileData(userDoc.data());
+                } else {
+                    showNotification("User profile not found.", "error");
+                    onBack();
+                }
+                setIsLoading(false);
+            };
+            fetchProfile();
+        }, [profileUid, onBack]);
+
+        if (isLoading) return <LoadingSpinner />;
+        if (!profileData) return null;
+
+        return (
+            <div className="p-4">
+                 <button onClick={onBack} className="flex items-center space-x-2 text-primary mb-4"><ArrowLeft size={16}/><span>Back</span></button>
+                <div className="bg-card p-6 rounded-2xl shadow-lg max-w-md mx-auto text-center border border-border">
+                    <img src={API_ENDPOINTS.avatar(profileData.avatarSeed, profileData.avatarStyle)} alt="avatar" className="w-32 h-32 rounded-full mx-auto border-4 border-primary/40 mb-4" />
+                    <h2 className="text-2xl font-bold text-foreground">@{profileData.username}</h2>
+                    {profileData.isNamePublic && <p className="text-xl text-foreground/80">{profileData.preferredName}</p>}
+                    {profileData.isPronounsPublic && <p className="text-sm text-foreground/60">{profileData.pronouns}</p>}
+                    {profileData.isZodiacPublic && <p className="text-sm text-foreground/60">{profileData.zodiac}</p>}
+                    {profileData.isBioPublic && <p className="mt-4 text-foreground/90">{profileData.bio}</p>}
+                </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     const CurrentView = () => {
         if (user && userData && userData.needsSetup) {
@@ -1592,7 +1615,7 @@ const App = () => {
             case 'horoscope': return <Horoscope zodiac={userData?.zodiac} />;
             case 'tarot': return <TarotReading user={user} showNotification={showNotification} />;
             case 'profile': return <Profile user={user} userData={userData} showNotification={showNotification} />;
-            case 'public_profile': return <PublicProfileView profileData={currentData} onBack={back} />;
+            case 'public_profile': return <PublicProfileView profileUid={currentData.uid} onBack={back} />;
             case 'past_readings': return <PastReadings user={user} userData={userData} showNotification={showNotification} onCardClick={(card) => { console.log("Card clicked:", card)}} />;
             case 'community': return <CommunityHub user={user} userData={userData} setChattingWith={setChattingWith} showNotification={showNotification} onProfileClick={(uid) => navigate('public_profile', { uid })}/>;
             case 'ouija': return <OuijaRoom user={user} userData={userData} onBack={back} db={db} />;
@@ -1619,7 +1642,7 @@ const App = () => {
             {!(userData && userData.needsSetup) && !chattingWith && <Header userData={userData} onLogout={handleLogout} onLogoClick={navigateToRoot} onAvatarClick={() => navigate('profile')} onBack={back} canGoBack={canGoBack} />}
             <main className={chattingWith ? "h-screen" : "pb-24 md:pb-4"}>
                 <AnimatePresence mode="wait">
-                    <motion.div key={currentView + (userData?.needsSetup ? 'setup' : '') + (chattingWith ? chattingWith.uid : '')} initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition} className={chattingWith ? "h-full" : ""}>
+                    <motion.div key={currentView + (userData?.needsSetup ? 'setup' : '') + (chattingWith ? chattingWith.uid : '') + currentData?.uid} initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition} className={chattingWith ? "h-full" : ""}>
                         <CurrentView />
                     </motion.div>
                 </AnimatePresence>
