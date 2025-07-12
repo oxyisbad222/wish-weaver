@@ -33,7 +33,7 @@ const AccountSetup = ({ user, db, onSetupComplete }) => {
     const [zodiac, setZodiac] = useState('Aries');
     const [bio, setBio] = useState('');
     const [avatarSeed, setAvatarSeed] = useState(user.uid);
-    const [avatarStyle] = useState('notionists');
+    const [avatarStyle] = useState('notionists'); // Default style
     const [error, setError] = useState('');
 
     const zodiacSigns = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
@@ -113,8 +113,8 @@ const AccountSetup = ({ user, db, onSetupComplete }) => {
                 avatarStyle,
                 isNamePublic: true,
                 isPronounsPublic: true,
-                isZodiacPublic: true,
                 isBioPublic: true,
+                isZodiacPublic: true,
                 friends: [],
                 friendRequestsSent: [],
                 friendRequestsReceived: [],
