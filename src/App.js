@@ -7,6 +7,7 @@ import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTrian
 import AccountSetup from './AccountSetup';
 import OuijaRoom from './OuijaRoom';
 
+// --- Firebase and API Configuration ---
 const firebaseConfig = {
     apiKey: process.env.REACT_APP_APIKEY,
     authDomain: process.env.REACT_APP_AUTHDOMAIN,
@@ -25,15 +26,16 @@ export const API_ENDPOINTS = {
     horoscope: (sign, type) => `/api/horoscope?sign=${sign.toLowerCase()}&type=${type}`,
     tarotImageBase: './cards/',
     avatar: (seed, style = 'notionists') => `https://api.dicebear.com/8.x/${style}/svg?seed=${seed}&backgroundColor=f0e7f7,e0f0e9,d1d4f9`,
-    natalChart: '/api/natal-chart' // Corrected API endpoint
+    natalChart: '/api/natal-chart'
 };
 
+// --- Custom Hooks ---
 const useNavigation = (initialView = 'dashboard') => {
     const [history, setHistory] = useState([{ view: initialView, data: null }]);
     const direction = useRef(1);
 
     const navigate = (view, data = null) => {
-        if (view === history[history.length - 1].view) return;
+        if (view === history[history.length - 1].view && JSON.stringify(data) === JSON.stringify(history[history.length - 1].data)) return;
         direction.current = 1;
         setHistory(prev => [...prev, { view, data }]);
     };
@@ -57,9 +59,10 @@ const useNavigation = (initialView = 'dashboard') => {
     return { navigate, back, navigateToRoot, currentRoute, canGoBack, direction: direction.current };
 };
 
+
+// --- Helper Functions ---
 const getInsightfulMeaning = (card, position, isReversed) => {
     const baseMeanings = isReversed ? card.meanings.shadow : card.meanings.light;
-
     const positionMeanings = {
         1: "The Heart of the Matter", 2: "The Obstacle", 3: "The Foundation",
         4: "The Recent Past", 5: "The Crown/Potential", 6: "The Near Future",
@@ -67,7 +70,6 @@ const getInsightfulMeaning = (card, position, isReversed) => {
         10: "The Final Outcome", 'Past': "The Past", 'Present': "The Present",
         'Future': "The Future", 'Situation': "The Card's Message"
     };
-
     return {
         title: `${card.name} ${isReversed ? '(Reversed)' : ''}`,
         positionContext: position && positionMeanings[position] ? positionMeanings[position] : '',
@@ -76,6 +78,7 @@ const getInsightfulMeaning = (card, position, isReversed) => {
     };
 };
 
+// --- UI Components ---
 const LoadingSpinner = () => (
     <div className="flex justify-center items-center h-screen w-full bg-background">
         <motion.div
@@ -141,6 +144,8 @@ const Button = ({ onClick, children, variant = 'primary', className = '', disabl
   };
   return <button onClick={onClick} className={`${baseClasses} ${variants[variant]} ${className}`} disabled={disabled}>{children}</button>;
 };
+
+// --- Page/View Components ---
 
 const Login = ({ setNotification }) => {
     const handleGoogleSignUp = async () => {
@@ -887,7 +892,6 @@ const Profile = ({ user, userData, showNotification }) => {
     );
 };
 
-// --- MODIFIED AND FINAL NATAL CHART COMPONENT ---
 const NatalChart = ({ userData, showNotification }) => {
     const [chartData, setChartData] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -920,7 +924,6 @@ const NatalChart = ({ userData, showNotification }) => {
                 throw new Error(data.details || 'The astrology service failed to generate a chart.');
             }
             
-            // Assuming the API returns an object with an 'output' array
             if (data && data.output) {
                 setChartData(data.output);
             } else {
@@ -994,8 +997,6 @@ const NatalChart = ({ userData, showNotification }) => {
         </div>
     );
 };
-
-// ... (Rest of your unchanged App.js code) ...
 
 const PastReadings = ({ user, userData, showNotification, onCardClick }) => {
     const [expandedReading, setExpandedReading] = useState(null);
@@ -1086,6 +1087,7 @@ const PastReadings = ({ user, userData, showNotification, onCardClick }) => {
         </div>
     );
 };
+
 const CommunityHub = ({ user, userData, setChattingWith, showNotification, onProfileClick }) => {
     const [activeTab, setActiveTab] = useState('affirmations');
 
@@ -1145,6 +1147,7 @@ const CommunityHub = ({ user, userData, setChattingWith, showNotification, onPro
         </div>
     );
 };
+
 const Wall = ({ type, user, userData, setNotification, onProfileClick }) => {
     const [posts, setPosts] = useState([]);
     const [newPost, setNewPost] = useState('');
@@ -1318,6 +1321,7 @@ const Wall = ({ type, user, userData, setNotification, onProfileClick }) => {
         </div>
     );
 };
+
 const FriendsList = ({ user, userData, setNotification, setChattingWith, onProfileClick }) => {
     const [friends, setFriends] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -1402,6 +1406,7 @@ const FriendsList = ({ user, userData, setNotification, setChattingWith, onProfi
         </div>
     );
 };
+
 const Notifications = ({ user, userData, setNotification, onProfileClick }) => {
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -1484,6 +1489,7 @@ const Notifications = ({ user, userData, setNotification, onProfileClick }) => {
         </div>
     );
 };
+
 const FindFriends = ({ user, userData, setNotification, onProfileClick }) => {
     const [searchUsername, setSearchUsername] = useState('');
     const [searchResult, setSearchResult] = useState(null);
@@ -1591,6 +1597,7 @@ const FindFriends = ({ user, userData, setNotification, onProfileClick }) => {
         </div>
     );
 };
+
 const ChatView = ({ user, friend, onBack }) => {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
@@ -1658,6 +1665,7 @@ const ChatView = ({ user, friend, onBack }) => {
         </div>
     );
 };
+
 const Footer = ({ navigate, activeView, userData }) => {
     const navItems = [
         { name: 'Home', view: 'dashboard', icon: <Menu /> },
@@ -1693,6 +1701,8 @@ const Footer = ({ navigate, activeView, userData }) => {
         </footer>
     );
 };
+
+// --- Main App Component ---
 const App = () => {
     const [user, setUser] = useState(null);
     const [userData, setUserData] = useState(null);
@@ -1860,4 +1870,5 @@ const App = () => {
         </div>
     );
 };
+
 export default App;
