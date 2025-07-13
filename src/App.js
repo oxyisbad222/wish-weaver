@@ -25,7 +25,7 @@ export const API_ENDPOINTS = {
     horoscope: (sign, type) => `/api/horoscope?sign=${sign.toLowerCase()}&type=${type}`,
     tarotImageBase: './cards/',
     avatar: (seed, style = 'notionists') => `https://api.dicebear.com/8.x/${style}/svg?seed=${seed}&backgroundColor=f0e7f7,e0f0e9,d1d4f9`,
-    natalChart: 'https://eorv997lbnxh6jj.m.pipedream.net'
+    natalChart: '/api/natal-chart' // Corrected API endpoint
 };
 
 const useNavigation = (initialView = 'dashboard') => {
@@ -44,7 +44,7 @@ const useNavigation = (initialView = 'dashboard') => {
             setHistory(prev => prev.slice(0, -1));
         }
     };
-    
+
     const navigateToRoot = () => {
         if (history.length <= 1) return;
         direction.current = -1;
@@ -59,7 +59,7 @@ const useNavigation = (initialView = 'dashboard') => {
 
 const getInsightfulMeaning = (card, position, isReversed) => {
     const baseMeanings = isReversed ? card.meanings.shadow : card.meanings.light;
-    
+
     const positionMeanings = {
         1: "The Heart of the Matter", 2: "The Obstacle", 3: "The Foundation",
         4: "The Recent Past", 5: "The Crown/Potential", 6: "The Near Future",
@@ -303,17 +303,17 @@ const Horoscope = ({ zodiac }) => {
         setLoading(true);
         setError(null);
         setHoroscope(null);
-        
+
         const url = API_ENDPOINTS.horoscope(zodiac, timeframe);
 
         try {
             const response = await fetch(url);
             const data = await response.json();
-            
+
             if (!response.ok || !data.success) {
                 throw new Error(data.error || "Failed to retrieve horoscope.");
             }
-            
+
             setHoroscope(data.data);
 
         } catch (err) {
@@ -336,7 +336,7 @@ const Horoscope = ({ zodiac }) => {
             {label}
         </button>
     );
-    
+
     return (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 sm:p-6">
             <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-lg border border-border max-w-3xl mx-auto">
@@ -351,7 +351,7 @@ const Horoscope = ({ zodiac }) => {
                        <TimeframeButton value="monthly" label="Monthly" />
                     </div>
                 </div>
-                
+
                 {loading && (
                     <div className="space-y-4">
                         <div className="h-4 bg-foreground/10 rounded w-full animate-pulse"></div>
@@ -379,7 +379,7 @@ const Horoscope = ({ zodiac }) => {
 const CardDisplay = ({ card, positionLabel, onCardClick }) => {
     return (
         <div className="flex flex-col items-center text-center cursor-pointer" onClick={() => onCardClick(card)}>
-            <motion.div 
+            <motion.div
               className="relative w-full aspect-[2/3.5] bg-gray-700 rounded-xl overflow-hidden"
               whileHover={{ scale: 1.05, y: -5 }}
               transition={{ type: 'spring', stiffness: 300 }}
@@ -410,7 +410,7 @@ const CelticCrossLayout = ({ cards, onCardClick }) => {
         <div className="w-full max-w-md mx-auto p-2 grid grid-cols-4 gap-2">
             <div className="col-start-2 row-start-2"><CardDisplay card={cards[0]} positionLabel={positions[0]} onCardClick={onCardClick} /></div>
             <div className="col-start-2 row-start-2 -rotate-90"><CardDisplay card={cards[1]} positionLabel={positions[1]} onCardClick={onCardClick} /></div>
-            
+
             <div className="col-start-3 row-start-2"><CardDisplay card={cards[4]} positionLabel={positions[4]} onCardClick={onCardClick} /></div>
             <div className="col-start-1 row-start-2"><CardDisplay card={cards[3]} positionLabel={positions[3]} onCardClick={onCardClick} /></div>
             <div className="col-start-2 row-start-3"><CardDisplay card={cards[2]} positionLabel={positions[2]} onCardClick={onCardClick} /></div>
@@ -471,7 +471,7 @@ const TarotReading = ({ user, showNotification }) => {
         setCards(drawnCards);
         setLoading(false);
     };
-    
+
     const handleSaveReading = async () => {
         if (!readingTitle) {
             showNotification("Please enter a title for your reading.", "error");
@@ -483,7 +483,7 @@ const TarotReading = ({ user, showNotification }) => {
             title: readingTitle,
             spreadType,
             date: new Date().toISOString(),
-            notes: "", 
+            notes: "",
             cards: cards.map((card, i) => {
                 let position;
                 if (spreadType === 'single') position = 'Situation';
@@ -502,7 +502,7 @@ const TarotReading = ({ user, showNotification }) => {
             showNotification("Error: Could not save reading.", "error");
         }
     };
-    
+
     const openSaveModal = () => {
         if (user.isAnonymous) {
             showNotification('Guests cannot save readings.', 'error');
@@ -519,15 +519,15 @@ const TarotReading = ({ user, showNotification }) => {
                 {loading && <div className="flex justify-center"><LoadingSpinner/></div>}
                 <div className="space-y-4">
                     {[['single', 'Simple Reading (1 Card)', 1], ['three-card', 'Three-Card Spread', 3], ['celtic-cross', 'Celtic Cross', 10]].map(([type, label, count], i) => (
-                        <motion.button 
-                            key={type} 
-                            initial={{ opacity: 0, x: -20 }} 
-                            animate={{ opacity: 1, x: 0 }} 
+                        <motion.button
+                            key={type}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: i * 0.1 }}
                             whileHover={{ scale: 1.03 }}
                             whileTap={{ scale: 0.98 }}
-                            onClick={() => drawCards(count, type)} 
-                            disabled={loading || fullDeck.length === 0} 
+                            onClick={() => drawCards(count, type)}
+                            disabled={loading || fullDeck.length === 0}
                             className="w-full bg-card border border-border p-4 rounded-xl hover:border-primary text-card-foreground font-semibold transition-all hover:bg-foreground/5 disabled:opacity-50"
                         >
                             {label}
@@ -537,7 +537,7 @@ const TarotReading = ({ user, showNotification }) => {
             </div>
         );
     }
-    
+
     const interpretation = selectedCard ? getInsightfulMeaning(selectedCard, null, selectedCard.isReversed) : null;
 
     return (
@@ -585,7 +585,7 @@ const TarotReading = ({ user, showNotification }) => {
                  <Button onClick={() => setSpreadType(null)} variant="secondary">New Spread</Button>
                  <Button onClick={openSaveModal} variant="primary" disabled={user.isAnonymous || cards.length === 0}>Save Reading</Button>
             </div>
-            
+
             {loading && <div className="flex justify-center"><LoadingSpinner/></div>}
             {error && <div className="max-w-md mx-auto"><ErrorDisplay message={error}/></div>}
 
@@ -630,7 +630,7 @@ const Profile = ({ user, userData, showNotification }) => {
     const [birthDate, setBirthDate] = useState(userData?.birthDate || '');
     const [birthTime, setBirthTime] = useState(userData?.birthTime || '');
     const [birthPlace, setBirthPlace] = useState(userData?.birthPlace || '');
-    
+
     const [privacy, setPrivacy] = useState(userData?.privacy || {
         pronouns: true,
         zodiac: true,
@@ -647,7 +647,6 @@ const Profile = ({ user, userData, showNotification }) => {
     const [newUsername, setNewUsername] = useState(userData?.username || '');
     const [isChangingUsername, setIsChangingUsername] = useState(false);
 
-    const zodiacSigns = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
     const avatarStyles = ['notionists', 'open-peeps'];
 
     const handleSave = async () => {
@@ -658,12 +657,12 @@ const Profile = ({ user, userData, showNotification }) => {
         showNotification('Saving...');
         const userDocRef = doc(db, "users", user.uid);
         try {
-            await updateDoc(userDocRef, { 
-                preferredName, 
-                pronouns, 
+            await updateDoc(userDocRef, {
+                preferredName,
+                pronouns,
                 bio,
-                avatarSeed, 
-                avatarStyle, 
+                avatarSeed,
+                avatarStyle,
                 zodiac,
                 birthDate,
                 birthTime,
@@ -676,7 +675,7 @@ const Profile = ({ user, userData, showNotification }) => {
             showNotification('Failed to save profile.', 'error');
         }
     };
-    
+
     const handlePrivacyChange = (field) => {
         setPrivacy(prev => ({ ...prev, [field]: !prev[field] }));
     }
@@ -696,10 +695,10 @@ const Profile = ({ user, userData, showNotification }) => {
             const batch = writeBatch(db);
             const userDocRef = doc(db, "users", user.uid);
             const usernameDocRef = doc(db, "usernames", userData.username);
-            
+
             batch.delete(userDocRef);
             batch.delete(usernameDocRef);
-            
+
             await batch.commit();
             await deleteUser(auth.currentUser);
 
@@ -710,11 +709,11 @@ const Profile = ({ user, userData, showNotification }) => {
             showNotification(`Failed to delete account. Error: ${error.message}`, 'error');
         }
     };
-    
+
     const handleUsernameChange = async () => {
         setIsChangingUsername(true);
         const newUsernameLower = newUsername.trim().toLowerCase();
-        
+
         if (newUsernameLower.length < 3 || newUsernameLower.length > 15) {
             showNotification("Username must be between 3 and 15 characters.", "error");
             setIsChangingUsername(false);
@@ -796,7 +795,7 @@ const Profile = ({ user, userData, showNotification }) => {
             <h2 className="text-3xl font-serif mb-6 text-foreground text-center">Profile & Settings</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
+
                 {/* Left Column: Profile Info */}
                 <div className="space-y-4">
                     <div className="flex flex-col items-center">
@@ -843,7 +842,7 @@ const Profile = ({ user, userData, showNotification }) => {
                         </select>
                     </div>
                 </div>
-                
+
                 {/* Right Column: Privacy & Birth Info */}
                 <div className="space-y-4">
                      <div>
@@ -878,7 +877,7 @@ const Profile = ({ user, userData, showNotification }) => {
                     </div>
                 </div>
             </div>
-            
+
             <div className="mt-8">
                 <Button onClick={handleSave} className="w-full" disabled={user.isAnonymous}>Save Profile Changes</Button>
                 {!user.isAnonymous && <Button onClick={() => setShowDeleteModal(true)} variant="ghost" className="w-full mt-4 text-red-500 hover:bg-red-500/10">Delete Account</Button>}
@@ -888,6 +887,7 @@ const Profile = ({ user, userData, showNotification }) => {
     );
 };
 
+// --- MODIFIED AND FINAL NATAL CHART COMPONENT ---
 const NatalChart = ({ userData, showNotification }) => {
     const [chartData, setChartData] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -901,77 +901,101 @@ const NatalChart = ({ userData, showNotification }) => {
 
         setLoading(true);
         setError(null);
+        setChartData(null);
 
         try {
-            // FIX: Standardize the date and time format for the agent.
-            // The agent likely expects a consistent format like ISO 8601 or a specific string.
-            // Here, we combine date and time and let the agent parse it.
-            // A more robust solution might be to convert to a UTC timestamp if the agent supports it.
-            const birthDateTime = `${userData.birthDate}T${userData.birthTime}`;
-
             const response = await fetch(API_ENDPOINTS.natalChart, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    // FIX: Pass the combined datetime string.
-                    datetime: birthDateTime,
-                    place: userData.birthPlace,
+                    date: userData.birthDate,
+                    time: userData.birthTime,
+                    location: userData.birthPlace,
                 })
             });
 
-            // FIX: Better error handling for non-ok responses.
+            const data = await response.json();
+
             if (!response.ok) {
-                let errorData;
-                try {
-                    // Try to parse the error response as JSON.
-                    errorData = await response.json();
-                } catch (e) {
-                    // If the error response isn't JSON, use the raw text.
-                    const errorText = await response.text();
-                    throw new Error(errorText || `Request failed with status: ${response.status}`);
-                }
-                // Use the message from the parsed JSON error, or a default message.
-                throw new Error(errorData.message || `Failed to generate natal chart. The server responded with status ${response.status}.`);
+                throw new Error(data.details || 'The astrology service failed to generate a chart.');
+            }
+            
+            // Assuming the API returns an object with an 'output' array
+            if (data && data.output) {
+                setChartData(data.output);
+            } else {
+                throw new Error("Received an unexpected data format from the astrology service.");
             }
 
-            const data = await response.json();
-            setChartData(data);
         } catch (err) {
             console.error("Error generating natal chart:", err);
-            // FIX: Display a more user-friendly error from the catch block.
-            setError(`An error occurred: ${err.message}. Please check your birth information or try again later.`);
+            setError(`An error occurred: ${err.message}`);
+            showNotification(err.message, 'error');
         } finally {
             setLoading(false);
         }
     };
-    
+
+    const renderPlanetRow = (planet) => (
+        <tr key={planet.name} className="border-b border-border last:border-none hover:bg-foreground/5">
+            <td className="p-3 font-semibold">{planet.name}</td>
+            <td className="p-3">{planet.sign}</td>
+            <td className="p-3">{planet.house}</td>
+            <td className="p-3">{planet.fullDegree.toFixed(2)}°</td>
+            <td className="p-3">{planet.isRetro === "true" ? 'Yes' : 'No'}</td>
+        </tr>
+    );
+
     return (
         <div className="p-4 sm:p-6 max-w-4xl mx-auto">
             <h2 className="text-3xl font-serif mb-6 text-center text-foreground">Natal Chart</h2>
             <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-lg border border-border">
-                {error && <ErrorDisplay message={error}/>}
+                {error && !chartData && <ErrorDisplay message={error} />}
+
                 {!chartData && !loading && (
                     <div className="text-center">
                         <p className="mb-4 text-foreground/80">Generate your astrological birth chart to get detailed insights into your personality and life path.</p>
-                        <Button onClick={generateChart} disabled={!userData.birthDate || !userData.birthTime || !userData.birthPlace}>Generate My Chart</Button>
-                         {(!userData.birthDate || !userData.birthTime || !userData.birthPlace) && <p className="text-xs text-amber-500 mt-2">Please complete your birth date, time, and place in your profile.</p>}
+                        <Button onClick={generateChart} disabled={!userData.birthDate || !userData.birthTime || !userData.birthPlace}>
+                            Generate My Chart
+                        </Button>
+                        {(!userData.birthDate || !userData.birthTime || !userData.birthPlace) && (
+                            <p className="text-xs text-amber-500 mt-2">Please complete your birth date, time, and place in your profile.</p>
+                        )}
                     </div>
                 )}
+                
                 {loading && <div className="flex justify-center"><LoadingSpinner/></div>}
+
                 {chartData && (
                     <div>
-                        <h3 className="text-xl font-semibold text-primary mb-4 text-center">Your Natal Chart</h3>
-                        {/* Render chart data - this part will need to be fleshed out based on the agent's response format */}
-                        <pre className="bg-background p-4 rounded-lg text-sm overflow-x-auto">
-                            {JSON.stringify(chartData, null, 2)}
-                        </pre>
+                        <h3 className="text-2xl font-bold mb-4 text-center text-primary">Your Natal Chart Planets</h3>
+                        <div className="overflow-x-auto rounded-lg border border-border">
+                            <table className="w-full text-left">
+                                <thead className="bg-background/50">
+                                    <tr>
+                                        <th className="p-3 font-semibold">Planet</th>
+                                        <th className="p-3 font-semibold">Sign</th>
+                                        <th className="p-3 font-semibold">House</th>
+                                        <th className="p-3 font-semibold">Degree</th>
+                                        <th className="p-3 font-semibold">Retrograde</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {chartData.map(renderPlanetRow)}
+                                </tbody>
+                            </table>
+                        </div>
+                        <Button onClick={() => setChartData(null)} variant="secondary" className="w-full mt-6">
+                            Generate Again
+                        </Button>
                     </div>
                 )}
             </div>
         </div>
-    )
+    );
 };
 
+// ... (Rest of your unchanged App.js code) ...
 
 const PastReadings = ({ user, userData, showNotification, onCardClick }) => {
     const [expandedReading, setExpandedReading] = useState(null);
@@ -979,11 +1003,10 @@ const PastReadings = ({ user, userData, showNotification, onCardClick }) => {
 
     const handleDeleteReading = async (readingToDelete) => {
         if (!window.confirm("Are you sure you want to delete this reading? This cannot be undone.")) return;
-        
+
         const userDocRef = doc(db, "users", user.uid);
-        const newReadings = userData.readings.filter(r => r.date !== readingToDelete.date);
         try {
-            await updateDoc(userDocRef, { readings: newReadings });
+            await updateDoc(userDocRef, { readings: arrayRemove(readingToDelete) });
             showNotification("Reading deleted.");
         } catch (error) {
             console.error("Error deleting reading:", error);
@@ -1026,7 +1049,7 @@ const PastReadings = ({ user, userData, showNotification, onCardClick }) => {
                 {!userData.readings || userData.readings.length === 0 ? (
                     <p className="text-center text-foreground/60 mt-10">You have no saved readings yet.</p>
                 ) : (
-                    userData.readings.slice().reverse().map((reading, index) => (
+                    [...userData.readings].sort((a, b) => new Date(b.date) - new Date(a.date)).map((reading) => (
                         <motion.div key={reading.date} layout className="bg-card p-4 rounded-xl shadow-md border border-border overflow-hidden">
                             <motion.div layout className="flex justify-between items-center cursor-pointer" onClick={() => handleExpand(reading)}>
                                 <div>
@@ -1044,7 +1067,7 @@ const PastReadings = ({ user, userData, showNotification, onCardClick }) => {
                                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-4">
                                             {reading.cards.map((cardData, cardIndex) => (
                                                 <div key={cardIndex}>
-                                                    <CardDisplay card={cardData} onCardClick={onCardClick}/>
+                                                    <CardDisplay card={cardData} onCardClick={() => {}}/>
                                                 </div>
                                             ))}
                                         </div>
@@ -1063,7 +1086,6 @@ const PastReadings = ({ user, userData, showNotification, onCardClick }) => {
         </div>
     );
 };
-
 const CommunityHub = ({ user, userData, setChattingWith, showNotification, onProfileClick }) => {
     const [activeTab, setActiveTab] = useState('affirmations');
 
@@ -1076,7 +1098,7 @@ const CommunityHub = ({ user, userData, setChattingWith, showNotification, onPro
             {count > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">{count}</span>}
         </button>
     );
-    
+
     const communitySections = [
         {name: 'affirmations', label: "Affirmations"},
         {name: 'public', label: 'Public Wall'},
@@ -1089,7 +1111,7 @@ const CommunityHub = ({ user, userData, setChattingWith, showNotification, onPro
     return (
         <div className="p-2 sm:p-6 max-w-4xl mx-auto">
             <h2 className="text-3xl font-serif mb-6 text-center text-foreground">Community Hub</h2>
-            
+
             <div className="sm:hidden mb-6">
                 <select value={activeTab} onChange={(e) => setActiveTab(e.target.value)} className="w-full bg-input text-foreground p-3 rounded-lg border border-border focus:border-primary">
                     {communitySections.map(section => (
@@ -1097,13 +1119,13 @@ const CommunityHub = ({ user, userData, setChattingWith, showNotification, onPro
                     ))}
                 </select>
             </div>
-            
-            <div className="hidden sm:flex justify-center space-x-2 mb-6">
+
+            <div className="hidden sm:flex justify-center flex-wrap gap-2 mb-6">
                 {communitySections.map(section => (
                      <TabButton key={section.name} tabName={section.name} label={section.label} count={section.count} />
                 ))}
             </div>
-            
+
             <AnimatePresence mode="wait">
                 <motion.div
                     key={activeTab}
@@ -1123,12 +1145,11 @@ const CommunityHub = ({ user, userData, setChattingWith, showNotification, onPro
         </div>
     );
 };
-
 const Wall = ({ type, user, userData, setNotification, onProfileClick }) => {
     const [posts, setPosts] = useState([]);
     const [newPost, setNewPost] = useState('');
     const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState(null); // FIX: Add error state
+    const [error, setError] = useState(null);
     const [showReportModal, setShowReportModal] = useState(null);
 
     const wallTitles = {
@@ -1136,31 +1157,25 @@ const Wall = ({ type, user, userData, setNotification, onProfileClick }) => {
         public: 'Public Wall',
         inner_circle: 'My Inner Circle',
     };
-    
+
     useEffect(() => {
-        // FIX: The query for 'inner_circle' can fail if the user has no friends.
-        // Firestore's `in` query requires a non-empty array.
-        // This ensures the query only runs when it's valid.
-        
         let q;
         const collectionRef = collection(db, `walls/${type}/posts`);
 
         if (type === 'inner_circle') {
             const friendsAndSelf = [...(userData.friends || []), user.uid];
-            // Only create the query if the array has members.
             if (friendsAndSelf.length > 0) {
                  q = query(collectionRef, where('authorId', 'in', friendsAndSelf), orderBy("timestamp", "desc"), limit(50));
             } else {
-                 // If the user has no friends, there are no posts to load.
                  setIsLoading(false);
                  setPosts([]);
-                 return; // Exit early
+                 return;
             }
         } else {
              q = query(collectionRef, orderBy("timestamp", "desc"), limit(50));
         }
-        
-        const unsubscribe = onSnapshot(q, 
+
+        const unsubscribe = onSnapshot(q,
             (querySnapshot) => {
                 const postsData = [];
                 querySnapshot.forEach((doc) => {
@@ -1168,9 +1183,9 @@ const Wall = ({ type, user, userData, setNotification, onProfileClick }) => {
                 });
                 setPosts(postsData);
                 setIsLoading(false);
-                setError(null); // Clear previous errors on success
-            }, 
-            (err) => { // FIX: Add error listener for the snapshot
+                setError(null);
+            },
+            (err) => {
                 console.error(`Error listening to ${type} wall:`, err);
                 setError(`Could not load posts. Please try again later.`);
                 setIsLoading(false);
@@ -1178,12 +1193,12 @@ const Wall = ({ type, user, userData, setNotification, onProfileClick }) => {
         );
 
         return () => unsubscribe();
-    }, [db, type, userData.friends, user.uid]);
+    }, [type, userData.friends, user.uid]);
 
     const handlePost = async (e) => {
         e.preventDefault();
         if (newPost.trim() === '' || user.isAnonymous) return;
-        
+
         const postData = {
             text: newPost,
             authorId: user.uid,
@@ -1203,14 +1218,14 @@ const Wall = ({ type, user, userData, setNotification, onProfileClick }) => {
             setNotification(`Failed to post to ${type} wall.`, "error");
         }
     };
-    
+
     const handleLike = async (postId) => {
         const postRef = doc(db, `walls/${type}/posts`, postId);
         try {
             await runTransaction(db, async (transaction) => {
                 const postDoc = await transaction.get(postRef);
                 if (!postDoc.exists()) { throw "Document does not exist!"; }
-                
+
                 const likes = postDoc.data().likes || [];
                 if (likes.includes(user.uid)) {
                     transaction.update(postRef, { likes: arrayRemove(user.uid) });
@@ -1223,7 +1238,7 @@ const Wall = ({ type, user, userData, setNotification, onProfileClick }) => {
              setNotification("Failed to update like.", "error");
         }
     };
-    
+
     const handleReport = async (postId, reason) => {
         setShowReportModal(null);
         const postRef = doc(db, `walls/${type}/posts`, postId);
@@ -1237,8 +1252,8 @@ const Wall = ({ type, user, userData, setNotification, onProfileClick }) => {
                     setNotification("You have already reported this post.", "error");
                     return;
                 }
-                
-                transaction.update(postRef, { reports: arrayUnion({ reporterId: user.uid, reason }) });
+
+                transaction.update(postRef, { reports: arrayUnion({ reporterId: user.uid, reason, reportedAt: serverTimestamp() }) });
                 setNotification("Post reported. Thank you.", "success");
             });
         } catch (error) {
@@ -1246,7 +1261,7 @@ const Wall = ({ type, user, userData, setNotification, onProfileClick }) => {
             setNotification("Failed to report post.", "error");
         }
     };
-    
+
     return (
         <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-lg border border-border">
              <AnimatePresence>
@@ -1265,7 +1280,7 @@ const Wall = ({ type, user, userData, setNotification, onProfileClick }) => {
             <h3 className="text-2xl font-serif text-primary mb-4">{wallTitles[type]}</h3>
             {!user.isAnonymous && (
                 <form onSubmit={handlePost} className="flex space-x-2 mb-6">
-                    <input 
+                    <input
                         type="text"
                         value={newPost}
                         onChange={(e) => setNewPost(e.target.value)}
@@ -1277,8 +1292,8 @@ const Wall = ({ type, user, userData, setNotification, onProfileClick }) => {
             )}
             <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
                 {isLoading && <p>Loading posts...</p>}
-                {error && <ErrorDisplay message={error} />} {/* FIX: Show error message */}
-                {!isLoading && !error && posts.length === 0 && ( // FIX: Show empty state message
+                {error && <ErrorDisplay message={error} />}
+                {!isLoading && !error && posts.length === 0 && (
                     <p className="text-center text-foreground/60 py-4">
                         {type === 'inner_circle' ? 'No posts from your Inner Circle yet. Add some friends!' : 'No posts here yet. Be the first!'}
                     </p>
@@ -1303,25 +1318,21 @@ const Wall = ({ type, user, userData, setNotification, onProfileClick }) => {
         </div>
     );
 };
-
 const FriendsList = ({ user, userData, setNotification, setChattingWith, onProfileClick }) => {
     const [friends, setFriends] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    const fetchFriendsAndRequests = useCallback(async () => {
-        if (!userData || !userData.friends) {
+    const fetchFriends = useCallback(async () => {
+        if (!userData || !userData.friends || userData.friends.length === 0) {
+            setFriends([]);
             setLoading(false);
             return;
-        };
+        }
         setLoading(true);
         try {
-            if (userData.friends && userData.friends.length > 0) {
-                const friendsQuery = query(collection(db, 'users'), where('uid', 'in', userData.friends));
-                const friendsSnapshot = await getDocs(friendsQuery);
-                setFriends(friendsSnapshot.docs.map(doc => doc.data()));
-            } else {
-                setFriends([]);
-            }
+            const friendsQuery = query(collection(db, 'users'), where('uid', 'in', userData.friends));
+            const friendsSnapshot = await getDocs(friendsQuery);
+            setFriends(friendsSnapshot.docs.map(doc => doc.data()));
         } catch (error) {
             console.error("Error fetching friends data:", error);
             setNotification("Could not load friends list.", "error");
@@ -1331,19 +1342,19 @@ const FriendsList = ({ user, userData, setNotification, setChattingWith, onProfi
     }, [userData, setNotification]);
 
     useEffect(() => {
-        fetchFriendsAndRequests();
-    }, [userData, fetchFriendsAndRequests]);
-    
+        fetchFriends();
+    }, [fetchFriends]);
+
     const handleRemoveFriend = async (friendUid) => {
         if (!window.confirm("Are you sure you want to remove this friend?")) return;
-        
+
         const batch = writeBatch(db);
         const currentUserRef = doc(db, "users", user.uid);
         const friendUserRef = doc(db, "users", friendUid);
 
         batch.update(currentUserRef, { friends: arrayRemove(friendUid) });
         batch.update(friendUserRef, { friends: arrayRemove(user.uid) });
-        
+
         try {
             await batch.commit();
             setNotification("Friend removed successfully.");
@@ -1391,25 +1402,21 @@ const FriendsList = ({ user, userData, setNotification, setChattingWith, onProfi
         </div>
     );
 };
-
 const Notifications = ({ user, userData, setNotification, onProfileClick }) => {
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const fetchRequests = useCallback(async () => {
-        if (!userData || !userData.friendRequestsReceived) {
+        if (!userData || !userData.friendRequestsReceived || userData.friendRequestsReceived.length === 0) {
+            setRequests([]);
             setLoading(false);
             return;
         }
         setLoading(true);
         try {
-            if (userData.friendRequestsReceived.length > 0) {
-                const requestsQuery = query(collection(db, 'users'), where('uid', 'in', userData.friendRequestsReceived));
-                const requestsSnapshot = await getDocs(requestsQuery);
-                setRequests(requestsSnapshot.docs.map(doc => doc.data()));
-            } else {
-                setRequests([]);
-            }
+            const requestsQuery = query(collection(db, 'users'), where('uid', 'in', userData.friendRequestsReceived));
+            const requestsSnapshot = await getDocs(requestsQuery);
+            setRequests(requestsSnapshot.docs.map(doc => doc.data()));
         } catch (error) {
             console.error("Error fetching friend requests:", error);
             setNotification("Could not load friend requests.", "error");
@@ -1420,7 +1427,7 @@ const Notifications = ({ user, userData, setNotification, onProfileClick }) => {
 
     useEffect(() => {
         fetchRequests();
-    }, [userData, fetchRequests]);
+    }, [fetchRequests]);
 
     const handleRequest = async (senderProfile, accept) => {
         const senderUid = senderProfile.uid;
@@ -1435,7 +1442,7 @@ const Notifications = ({ user, userData, setNotification, onProfileClick }) => {
             batch.update(currentUserRef, { friends: arrayUnion(senderUid) });
             batch.update(senderUserRef, { friends: arrayUnion(user.uid) });
         }
-        
+
         try {
             await batch.commit();
             setNotification(accept ? `You and @${senderProfile.username} are now friends!` : "Request declined.");
@@ -1444,7 +1451,7 @@ const Notifications = ({ user, userData, setNotification, onProfileClick }) => {
             setNotification("Failed to process request.", "error");
         }
     };
-    
+
     return (
         <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-lg border border-border">
             <h3 className="text-2xl font-serif text-primary mb-4">Notifications</h3>
@@ -1477,7 +1484,6 @@ const Notifications = ({ user, userData, setNotification, onProfileClick }) => {
         </div>
     );
 };
-
 const FindFriends = ({ user, userData, setNotification, onProfileClick }) => {
     const [searchUsername, setSearchUsername] = useState('');
     const [searchResult, setSearchResult] = useState(null);
@@ -1509,7 +1515,7 @@ const FindFriends = ({ user, userData, setNotification, onProfileClick }) => {
                 if (userDoc.exists()) {
                     setSearchResult(userDoc.data());
                 } else {
-                    setSearchMessage('User not found.');
+                    setSearchMessage('User data not found.');
                 }
             }
         } catch (error) {
@@ -1547,7 +1553,7 @@ const FindFriends = ({ user, userData, setNotification, onProfileClick }) => {
         <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-lg border border-border">
             <h3 className="text-2xl font-serif text-primary mb-4">Find Friends</h3>
             <form onSubmit={handleSearch} className="flex space-x-2 mb-4">
-                <input 
+                <input
                     type="text"
                     value={searchUsername}
                     onChange={(e) => setSearchUsername(e.target.value)}
@@ -1557,9 +1563,9 @@ const FindFriends = ({ user, userData, setNotification, onProfileClick }) => {
                 <Button type="submit" variant="primary" className="px-4" disabled={isSearching}>Search</Button>
             </form>
 
-            {isSearching && <p>Searching...</p>}
+            {isSearching && <p className="text-center">Searching...</p>}
             {searchMessage && <p className="text-center text-foreground/60 py-4">{searchMessage}</p>}
-            
+
             {searchResult && (
                 <div className="bg-background p-3 rounded-lg flex items-center justify-between">
                     <div className="flex items-center space-x-3 cursor-pointer" onClick={() => onProfileClick(searchResult.uid)}>
@@ -1585,7 +1591,6 @@ const FindFriends = ({ user, userData, setNotification, onProfileClick }) => {
         </div>
     );
 };
-
 const ChatView = ({ user, friend, onBack }) => {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
@@ -1653,7 +1658,6 @@ const ChatView = ({ user, friend, onBack }) => {
         </div>
     );
 };
-
 const Footer = ({ navigate, activeView, userData }) => {
     const navItems = [
         { name: 'Home', view: 'dashboard', icon: <Menu /> },
@@ -1668,9 +1672,9 @@ const Footer = ({ navigate, activeView, userData }) => {
                 {navItems.map(item => {
                     const isDisabled = item.guestDisabled && userData?.isAnonymous;
                     return (
-                        <button 
-                            key={item.name} 
-                            onClick={() => !isDisabled && navigate(item.view)} 
+                        <button
+                            key={item.name}
+                            onClick={() => !isDisabled && navigate(item.view)}
                             disabled={isDisabled}
                             className={`flex flex-col items-center justify-center w-full py-2 px-1 rounded-lg transition-all duration-300 relative text-sm ${activeView === item.view ? 'text-primary' : 'text-foreground/60'} ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:text-primary'}`}
                         >
@@ -1689,7 +1693,6 @@ const Footer = ({ navigate, activeView, userData }) => {
         </footer>
     );
 };
-
 const App = () => {
     const [user, setUser] = useState(null);
     const [userData, setUserData] = useState(null);
@@ -1719,14 +1722,14 @@ const App = () => {
                     });
                     return () => unsubSnapshot();
                 } else {
-                    setUserData({ 
-                        uid: currentUser.uid, 
-                        preferredName: 'Guest', 
+                    setUserData({
+                        uid: currentUser.uid,
+                        preferredName: 'Guest',
                         avatarSeed: 'guest-user-seed',
                         avatarStyle: 'notionists',
-                        zodiac: 'Aries', 
-                        readings: [], 
-                        isAnonymous: true 
+                        zodiac: 'Aries',
+                        readings: [],
+                        isAnonymous: true
                     });
                     setLoadingAuth(false);
                 }
@@ -1734,15 +1737,15 @@ const App = () => {
                 setUser(null);
                 setUserData(null);
                 setLoadingAuth(false);
+                navigateToRoot();
             }
         });
         return () => unsubscribe();
-    }, []);
+    }, [navigateToRoot]);
 
     const handleLogout = async () => {
         await signOut(auth);
         setChattingWith(null);
-        navigateToRoot();
     };
 
     const pageVariants = {
@@ -1752,7 +1755,7 @@ const App = () => {
     };
 
     const pageTransition = { type: "tween", ease: "anticipate", duration: 0.4 };
-    
+
     const ChatWrapper = ({ user, friend, onBack }) => {
         return (
             <div className="h-screen flex flex-col">
@@ -1761,7 +1764,7 @@ const App = () => {
             </div>
         )
     };
-    
+
     const PublicProfileView = ({ profileUid, onBack }) => {
         const [profileData, setProfileData] = useState(null);
         const [isLoading, setIsLoading] = useState(true);
@@ -1784,19 +1787,19 @@ const App = () => {
 
         if (isLoading) return <LoadingSpinner />;
         if (!profileData) return null;
-        
-        const { privacy = {} } = profileData;
+
+        const { privacy = {}, ...publicProfile } = profileData;
 
         return (
             <div className="p-4">
                  <button onClick={onBack} className="flex items-center space-x-2 text-primary mb-4"><ArrowLeft size={16}/><span>Back</span></button>
                 <div className="bg-card p-6 rounded-2xl shadow-lg max-w-md mx-auto text-center border border-border">
-                    <img src={API_ENDPOINTS.avatar(profileData.avatarSeed, profileData.avatarStyle)} alt="avatar" className="w-32 h-32 rounded-full mx-auto border-4 border-primary/40 mb-4" />
-                    <h2 className="text-2xl font-bold text-foreground">@{profileData.username}</h2>
-                     <p className="text-xl text-foreground/80">{profileData.preferredName}</p>
-                    {privacy.pronouns && <p className="text-sm text-foreground/60">{profileData.pronouns}</p>}
-                    {privacy.zodiac && <p className="text-sm text-foreground/60">{profileData.zodiac}</p>}
-                    {privacy.bio && <p className="mt-4 text-foreground/90">{profileData.bio}</p>}
+                    <img src={API_ENDPOINTS.avatar(publicProfile.avatarSeed, publicProfile.avatarStyle)} alt="avatar" className="w-32 h-32 rounded-full mx-auto border-4 border-primary/40 mb-4" />
+                    <h2 className="text-2xl font-bold text-foreground">@{publicProfile.username}</h2>
+                     <p className="text-xl text-foreground/80">{publicProfile.preferredName}</p>
+                    {privacy.pronouns && <p className="text-sm text-foreground/60">{publicProfile.pronouns}</p>}
+                    {privacy.zodiac && <p className="text-sm text-foreground/60">{publicProfile.zodiac}</p>}
+                    {privacy.bio && <p className="mt-4 text-foreground/90">{publicProfile.bio}</p>}
                 </div>
             </div>
         );
@@ -1806,7 +1809,7 @@ const App = () => {
         if (user && userData && userData.needsSetup) {
             return <AccountSetup user={user} db={db} onSetupComplete={() => navigate('dashboard')} />;
         }
-        
+
         if (chattingWith) {
             return <ChatWrapper user={user} friend={chattingWith} onBack={() => setChattingWith(null)} />;
         }
@@ -1822,7 +1825,7 @@ const App = () => {
             case 'profile': return <Profile user={user} userData={userData} showNotification={showNotification} />;
             case 'natal_chart': return <NatalChart userData={userData} showNotification={showNotification} />;
             case 'public_profile': return <PublicProfileView profileUid={currentData.uid} onBack={back} />;
-            case 'past_readings': return <PastReadings user={user} userData={userData} showNotification={showNotification} onCardClick={(card) => { console.log("Card clicked:", card)}} />;
+            case 'past_readings': return <PastReadings user={user} userData={userData} showNotification={showNotification} />;
             case 'community': return <CommunityHub user={user} userData={userData} setChattingWith={setChattingWith} showNotification={showNotification} onProfileClick={(uid) => navigate('public_profile', { uid })}/>;
             case 'ouija': return <OuijaRoom user={user} userData={userData} onBack={back} db={db} />;
             default: return <Dashboard navigate={navigate} userData={userData}/>;
@@ -1848,7 +1851,7 @@ const App = () => {
             {!(userData && userData.needsSetup) && !chattingWith && <Header userData={userData} onLogout={handleLogout} onLogoClick={navigateToRoot} onAvatarClick={() => navigate('profile')} onBack={back} canGoBack={canGoBack} />}
             <main className={chattingWith ? "h-screen" : "pb-24 md:pb-4"}>
                 <AnimatePresence mode="wait">
-                    <motion.div key={currentView + (userData?.needsSetup ? 'setup' : '') + (chattingWith ? chattingWith.uid : '') + currentData?.uid} initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition} className={chattingWith ? "h-full" : ""}>
+                    <motion.div key={currentView + (userData?.needsSetup ? 'setup' : '') + (chattingWith ? chattingWith.uid : '') + (currentData?.uid || '')} initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition} className={chattingWith ? "h-full" : ""}>
                         <CurrentView />
                     </motion.div>
                 </AnimatePresence>
