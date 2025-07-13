@@ -903,26 +903,43 @@ const NatalChart = ({ userData, showNotification }) => {
         setError(null);
 
         try {
+            // FIX: Standardize the date and time format for the agent.
+            // The agent likely expects a consistent format like ISO 8601 or a specific string.
+            // Here, we combine date and time and let the agent parse it.
+            // A more robust solution might be to convert to a UTC timestamp if the agent supports it.
+            const birthDateTime = `${userData.birthDate}T${userData.birthTime}`;
+
             const response = await fetch(API_ENDPOINTS.natalChart, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    date: userData.birthDate,
-                    time: userData.birthTime,
+                    // FIX: Pass the combined datetime string.
+                    datetime: birthDateTime,
                     place: userData.birthPlace,
                 })
             });
 
+            // FIX: Better error handling for non-ok responses.
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Failed to generate natal chart.');
+                let errorData;
+                try {
+                    // Try to parse the error response as JSON.
+                    errorData = await response.json();
+                } catch (e) {
+                    // If the error response isn't JSON, use the raw text.
+                    const errorText = await response.text();
+                    throw new Error(errorText || `Request failed with status: ${response.status}`);
+                }
+                // Use the message from the parsed JSON error, or a default message.
+                throw new Error(errorData.message || `Failed to generate natal chart. The server responded with status ${response.status}.`);
             }
 
             const data = await response.json();
             setChartData(data);
         } catch (err) {
             console.error("Error generating natal chart:", err);
-            setError(err.message);
+            // FIX: Display a more user-friendly error from the catch block.
+            setError(`An error occurred: ${err.message}. Please check your birth information or try again later.`);
         } finally {
             setLoading(false);
         }
@@ -936,7 +953,8 @@ const NatalChart = ({ userData, showNotification }) => {
                 {!chartData && !loading && (
                     <div className="text-center">
                         <p className="mb-4 text-foreground/80">Generate your astrological birth chart to get detailed insights into your personality and life path.</p>
-                        <Button onClick={generateChart}>Generate My Chart</Button>
+                        <Button onClick={generateChart} disabled={!userData.birthDate || !userData.birthTime || !userData.birthPlace}>Generate My Chart</Button>
+                         {(!userData.birthDate || !userData.birthTime || !userData.birthPlace) && <p className="text-xs text-amber-500 mt-2">Please complete your birth date, time, and place in your profile.</p>}
                     </div>
                 )}
                 {loading && <div className="flex justify-center"><LoadingSpinner/></div>}
@@ -1110,6 +1128,7 @@ const Wall = ({ type, user, userData, setNotification, onProfileClick }) => {
     const [posts, setPosts] = useState([]);
     const [newPost, setNewPost] = useState('');
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null); // FIX: Add error state
     const [showReportModal, setShowReportModal] = useState(null);
 
     const wallTitles = {
@@ -1119,22 +1138,45 @@ const Wall = ({ type, user, userData, setNotification, onProfileClick }) => {
     };
     
     useEffect(() => {
+        // FIX: The query for 'inner_circle' can fail if the user has no friends.
+        // Firestore's `in` query requires a non-empty array.
+        // This ensures the query only runs when it's valid.
+        
         let q;
+        const collectionRef = collection(db, `walls/${type}/posts`);
+
         if (type === 'inner_circle') {
-             const friendsAndSelf = [...(userData.friends || []), user.uid];
-             q = query(collection(db, `walls/${type}/posts`), where('authorId', 'in', friendsAndSelf), orderBy("timestamp", "desc"), limit(50));
+            const friendsAndSelf = [...(userData.friends || []), user.uid];
+            // Only create the query if the array has members.
+            if (friendsAndSelf.length > 0) {
+                 q = query(collectionRef, where('authorId', 'in', friendsAndSelf), orderBy("timestamp", "desc"), limit(50));
+            } else {
+                 // If the user has no friends, there are no posts to load.
+                 setIsLoading(false);
+                 setPosts([]);
+                 return; // Exit early
+            }
         } else {
-             q = query(collection(db, `walls/${type}/posts`), orderBy("timestamp", "desc"), limit(50));
+             q = query(collectionRef, orderBy("timestamp", "desc"), limit(50));
         }
         
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const postsData = [];
-            querySnapshot.forEach((doc) => {
-                postsData.push({ id: doc.id, ...doc.data() });
-            });
-            setPosts(postsData);
-            setIsLoading(false);
-        });
+        const unsubscribe = onSnapshot(q, 
+            (querySnapshot) => {
+                const postsData = [];
+                querySnapshot.forEach((doc) => {
+                    postsData.push({ id: doc.id, ...doc.data() });
+                });
+                setPosts(postsData);
+                setIsLoading(false);
+                setError(null); // Clear previous errors on success
+            }, 
+            (err) => { // FIX: Add error listener for the snapshot
+                console.error(`Error listening to ${type} wall:`, err);
+                setError(`Could not load posts. Please try again later.`);
+                setIsLoading(false);
+            }
+        );
+
         return () => unsubscribe();
     }, [db, type, userData.friends, user.uid]);
 
@@ -1235,6 +1277,12 @@ const Wall = ({ type, user, userData, setNotification, onProfileClick }) => {
             )}
             <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
                 {isLoading && <p>Loading posts...</p>}
+                {error && <ErrorDisplay message={error} />} {/* FIX: Show error message */}
+                {!isLoading && !error && posts.length === 0 && ( // FIX: Show empty state message
+                    <p className="text-center text-foreground/60 py-4">
+                        {type === 'inner_circle' ? 'No posts from your Inner Circle yet. Add some friends!' : 'No posts here yet. Be the first!'}
+                    </p>
+                )}
                 {posts.map(post => (
                     <div key={post.id} className="bg-background p-4 rounded-lg flex items-start space-x-4">
                         <img onClick={() => onProfileClick(post.authorId)} src={API_ENDPOINTS.avatar(post.authorAvatarSeed, post.authorAvatarStyle)} alt="avatar" className="w-10 h-10 rounded-full border-2 border-primary/30 cursor-pointer"/>
