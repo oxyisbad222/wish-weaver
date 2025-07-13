@@ -3,7 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, signInAnonymously, deleteUser } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, arrayRemove, collection, query, where, getDocs, writeBatch, serverTimestamp, onSnapshot, orderBy, limit, addDoc, deleteDoc, runTransaction } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle, Info, Users, MessageSquare, Sparkles, UserPlus, Send, Check, X, Trash2, Flag, Bell, Edit, Save, XCircle } from 'lucide-react';
+import { LogOut, User, Star, Menu, Key, Feather, BookOpen, ArrowLeft, AlertTriangle, Info, Users, MessageSquare, Sparkles, UserPlus, Send, Check, X, Trash2, Flag, Bell, Edit, Save, XCircle, Heart, Sun } from 'lucide-react';
 import AccountSetup from './AccountSetup';
 import OuijaRoom from './OuijaRoom';
 
@@ -24,7 +24,8 @@ const provider = new GoogleAuthProvider();
 export const API_ENDPOINTS = {
     horoscope: (sign, type) => `/api/horoscope?sign=${sign.toLowerCase()}&type=${type}`,
     tarotImageBase: './cards/',
-    avatar: (seed, style = 'notionists') => `https://api.dicebear.com/8.x/${style}/svg?seed=${seed}&backgroundColor=f0e7f7,e0f0e9,d1d4f9`
+    avatar: (seed, style = 'notionists') => `https://api.dicebear.com/8.x/${style}/svg?seed=${seed}&backgroundColor=f0e7f7,e0f0e9,d1d4f9`,
+    natalChart: 'https://eorv997lbnxh6jj.m.pipedream.net'
 };
 
 const useNavigation = (initialView = 'dashboard') => {
@@ -256,6 +257,7 @@ const Dashboard = ({ navigate, userData }) => {
     const items = [
         { view: 'horoscope', title: 'Horoscope', desc: 'Daily, weekly, and monthly forecasts.', icon: <Star/> },
         { view: 'tarot', title: 'Tarot Reading', desc: 'Gain insight with a powerful card spread.', icon: <Feather/> },
+        { view: 'natal_chart', title: 'Natal Chart', desc: 'Generate your astrological birth chart.', icon: <Sun/>, guestDisabled: true },
         { view: 'past_readings', title: 'Reading Journal', desc: 'Review your saved tarot readings.', icon: <BookOpen />, guestDisabled: true },
         { view: 'community', title: 'Community', desc: 'Connect with friends & share affirmations.', icon: <Users/>, guestDisabled: true },
         { view: 'ouija', title: 'Ouija Room', desc: 'Communicate with the other side.', icon: <Sparkles/>, guestDisabled: true },
@@ -625,10 +627,19 @@ const Profile = ({ user, userData, showNotification }) => {
     const [avatarSeed, setAvatarSeed] = useState(userData?.avatarSeed || '');
     const [avatarStyle, setAvatarStyle] = useState(userData?.avatarStyle || 'notionists');
     const [zodiac, setZodiac] = useState(userData?.zodiac || 'Aries');
-    const [isNamePublic, setIsNamePublic] = useState(userData?.isNamePublic ?? true);
-    const [isPronounsPublic, setIsPronounsPublic] = useState(userData?.isPronounsPublic ?? true);
-    const [isBioPublic, setIsBioPublic] = useState(userData?.isBioPublic ?? true);
-    const [isZodiacPublic, setIsZodiacPublic] = useState(userData?.isZodiacPublic ?? true);
+    const [birthDate, setBirthDate] = useState(userData?.birthDate || '');
+    const [birthTime, setBirthTime] = useState(userData?.birthTime || '');
+    const [birthPlace, setBirthPlace] = useState(userData?.birthPlace || '');
+    
+    const [privacy, setPrivacy] = useState(userData?.privacy || {
+        pronouns: true,
+        zodiac: true,
+        bio: true,
+        birthDate: false,
+        birthTime: false,
+        birthPlace: false,
+    });
+
     const [showInfo, setShowInfo] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
@@ -654,10 +665,10 @@ const Profile = ({ user, userData, showNotification }) => {
                 avatarSeed, 
                 avatarStyle, 
                 zodiac,
-                isNamePublic,
-                isPronounsPublic,
-                isBioPublic,
-                isZodiacPublic
+                birthDate,
+                birthTime,
+                birthPlace,
+                privacy
             });
             showNotification('Profile saved successfully!');
         } catch (error) {
@@ -665,6 +676,10 @@ const Profile = ({ user, userData, showNotification }) => {
             showNotification('Failed to save profile.', 'error');
         }
     };
+    
+    const handlePrivacyChange = (field) => {
+        setPrivacy(prev => ({ ...prev, [field]: !prev[field] }));
+    }
 
     const handleDeleteAccount = async () => {
         if (deleteConfirmationText !== 'delete my account') {
@@ -749,7 +764,8 @@ const Profile = ({ user, userData, showNotification }) => {
 
 
     return (
-        <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-lg max-w-lg mx-auto border border-border">
+        <div className="p-4 sm:p-6 max-w-2xl mx-auto">
+        <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-lg border border-border">
             <AnimatePresence>
                 {showInfo && (
                     <Modal onClose={() => setShowInfo(false)}>
@@ -779,10 +795,14 @@ const Profile = ({ user, userData, showNotification }) => {
             </AnimatePresence>
             <h2 className="text-3xl font-serif mb-6 text-foreground text-center">Profile & Settings</h2>
 
-            <div className="flex flex-col items-center mb-6">
-                <img src={API_ENDPOINTS.avatar(avatarSeed, avatarStyle)} alt="avatar" className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-primary/40 mb-4" />
-                <div className="w-full space-y-4">
-                    <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* Left Column: Profile Info */}
+                <div className="space-y-4">
+                    <div className="flex flex-col items-center">
+                        <img src={API_ENDPOINTS.avatar(avatarSeed, avatarStyle)} alt="avatar" className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-primary/40 mb-4" />
+                    </div>
+                     <div>
                         <label className="text-foreground/80 mb-2 block text-sm">Username</label>
                         <div className="flex items-center space-x-2">
                              <input type="text" value={`@${userData?.username || ''}`} className="bg-input/50 text-foreground/70 p-3 rounded-lg w-full border border-border" disabled/>
@@ -809,6 +829,10 @@ const Profile = ({ user, userData, showNotification }) => {
                         <input id="pronouns" type="text" value={pronouns} onChange={(e) => setPronouns(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors" disabled={user.isAnonymous}/>
                     </div>
                     <div>
+                         <label htmlFor="bio" className="text-foreground/80 mb-2 block text-sm">Bio</label>
+                         <textarea id="bio" value={bio} onChange={(e) => setBio(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary h-24" disabled={user.isAnonymous}></textarea>
+                    </div>
+                     <div>
                          <label htmlFor="avatarSeed" className="text-foreground/80 mb-2 flex items-center text-sm">Avatar Seed <Info size={14} className="ml-2 cursor-pointer" onClick={() => setShowInfo(true)}/></label>
                         <input id="avatarSeed" type="text" value={avatarSeed} onChange={(e) => setAvatarSeed(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors" placeholder="Enter anything here" disabled={user.isAnonymous}/>
                     </div>
@@ -818,20 +842,118 @@ const Profile = ({ user, userData, showNotification }) => {
                             {avatarStyles.map(style => <option key={style} value={style}>{style}</option>)}
                         </select>
                     </div>
-                    <div>
-                         <label htmlFor="zodiac" className="text-foreground/80 mb-2 block text-sm">Zodiac Sign</label>
-                        <select id="zodiac" value={zodiac} onChange={(e) => setZodiac(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors appearance-none" disabled={user.isAnonymous}>
-                            {zodiacSigns.map(sign => <option key={sign} value={sign}>{sign}</option>)}
-                        </select>
+                </div>
+                
+                {/* Right Column: Privacy & Birth Info */}
+                <div className="space-y-4">
+                     <div>
+                        <h3 className="text-lg font-semibold text-primary mb-2">Natal Chart Info</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label htmlFor="birthDate" className="text-foreground/80 mb-1 block text-sm">Birth Date</label>
+                                <input id="birthDate" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary" disabled={user.isAnonymous}/>
+                            </div>
+                             <div>
+                                <label htmlFor="birthTime" className="text-foreground/80 mb-1 block text-sm">Birth Time</label>
+                                <input id="birthTime" type="time" value={birthTime} onChange={(e) => setBirthTime(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary" disabled={user.isAnonymous}/>
+                            </div>
+                            <div>
+                                <label htmlFor="birthPlace" className="text-foreground/80 mb-1 block text-sm">Birth Place</label>
+                                <input id="birthPlace" type="text" value={birthPlace} onChange={(e) => setBirthPlace(e.target.value)} placeholder="e.g., City, State, Country" className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary" disabled={user.isAnonymous}/>
+                            </div>
+                        </div>
+                    </div>
+                     <div>
+                        <h3 className="text-lg font-semibold text-primary mb-2">Privacy Settings</h3>
+                        <div className="space-y-2">
+                            {Object.keys(privacy).map(key => (
+                                <div key={key} className="flex items-center justify-between bg-background p-3 rounded-lg">
+                                    <label htmlFor={`privacy-${key}`} className="text-foreground/90 capitalize">{key.replace(/([A-Z])/g, ' $1')}</label>
+                                    <button onClick={() => handlePrivacyChange(key)} className={`w-12 h-6 rounded-full p-1 transition-colors ${privacy[key] ? 'bg-green-500' : 'bg-gray-600'}`}>
+                                        <motion.div layout className={`w-4 h-4 rounded-full bg-white transition-transform ${privacy[key] ? 'translate-x-6' : ''}`} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </div>
             
-            <Button onClick={handleSave} className="w-full" disabled={user.isAnonymous}>Save Profile Changes</Button>
-            {!user.isAnonymous && <Button onClick={() => setShowDeleteModal(true)} variant="ghost" className="w-full mt-4 text-red-500 hover:bg-red-500/10">Delete Account</Button>}
+            <div className="mt-8">
+                <Button onClick={handleSave} className="w-full" disabled={user.isAnonymous}>Save Profile Changes</Button>
+                {!user.isAnonymous && <Button onClick={() => setShowDeleteModal(true)} variant="ghost" className="w-full mt-4 text-red-500 hover:bg-red-500/10">Delete Account</Button>}
+            </div>
+        </div>
         </div>
     );
 };
+
+const NatalChart = ({ userData, showNotification }) => {
+    const [chartData, setChartData] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+
+    const generateChart = async () => {
+        if (!userData.birthDate || !userData.birthTime || !userData.birthPlace) {
+            showNotification('Please provide your full birth date, time, and place in your profile to generate a chart.', 'error');
+            return;
+        }
+
+        setLoading(true);
+        setError(null);
+
+        try {
+            const response = await fetch(API_ENDPOINTS.natalChart, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    date: userData.birthDate,
+                    time: userData.birthTime,
+                    place: userData.birthPlace,
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to generate natal chart.');
+            }
+
+            const data = await response.json();
+            setChartData(data);
+        } catch (err) {
+            console.error("Error generating natal chart:", err);
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+    
+    return (
+        <div className="p-4 sm:p-6 max-w-4xl mx-auto">
+            <h2 className="text-3xl font-serif mb-6 text-center text-foreground">Natal Chart</h2>
+            <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-lg border border-border">
+                {error && <ErrorDisplay message={error}/>}
+                {!chartData && !loading && (
+                    <div className="text-center">
+                        <p className="mb-4 text-foreground/80">Generate your astrological birth chart to get detailed insights into your personality and life path.</p>
+                        <Button onClick={generateChart}>Generate My Chart</Button>
+                    </div>
+                )}
+                {loading && <div className="flex justify-center"><LoadingSpinner/></div>}
+                {chartData && (
+                    <div>
+                        <h3 className="text-xl font-semibold text-primary mb-4 text-center">Your Natal Chart</h3>
+                        {/* Render chart data - this part will need to be fleshed out based on the agent's response format */}
+                        <pre className="bg-background p-4 rounded-lg text-sm overflow-x-auto">
+                            {JSON.stringify(chartData, null, 2)}
+                        </pre>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+};
+
 
 const PastReadings = ({ user, userData, showNotification, onCardClick }) => {
     const [expandedReading, setExpandedReading] = useState(null);
@@ -939,6 +1061,8 @@ const CommunityHub = ({ user, userData, setChattingWith, showNotification, onPro
     
     const communitySections = [
         {name: 'affirmations', label: "Affirmations"},
+        {name: 'public', label: 'Public Wall'},
+        {name: 'inner_circle', label: 'Inner Circle'},
         {name: 'friends', label: "Friends"},
         {name: 'notifications', label: "Notifications", count: userData?.friendRequestsReceived?.length || 0},
         {name: 'find', label: "Find Friends"}
@@ -970,7 +1094,9 @@ const CommunityHub = ({ user, userData, setChattingWith, showNotification, onPro
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2 }}
                 >
-                    {activeTab === 'affirmations' && <AffirmationWall user={user} userData={userData} setNotification={showNotification} onProfileClick={onProfileClick} />}
+                    {activeTab === 'affirmations' && <Wall type="affirmations" user={user} userData={userData} setNotification={showNotification} onProfileClick={onProfileClick} />}
+                    {activeTab === 'public' && <Wall type="public" user={user} userData={userData} setNotification={showNotification} onProfileClick={onProfileClick} />}
+                    {activeTab === 'inner_circle' && <Wall type="inner_circle" user={user} userData={userData} setNotification={showNotification} onProfileClick={onProfileClick} />}
                     {activeTab === 'friends' && <FriendsList user={user} userData={userData} setNotification={showNotification} setChattingWith={setChattingWith} onProfileClick={onProfileClick}/>}
                     {activeTab === 'notifications' && <Notifications user={user} userData={userData} setNotification={showNotification} onProfileClick={onProfileClick}/>}
                     {activeTab === 'find' && <FindFriends user={user} userData={userData} setNotification={showNotification} onProfileClick={onProfileClick}/>}
@@ -980,119 +1106,148 @@ const CommunityHub = ({ user, userData, setChattingWith, showNotification, onPro
     );
 };
 
-const AffirmationWall = ({ user, userData, setNotification, onProfileClick }) => {
-    const [affirmations, setAffirmations] = useState([]);
-    const [newAffirmation, setNewAffirmation] = useState('');
+const Wall = ({ type, user, userData, setNotification, onProfileClick }) => {
+    const [posts, setPosts] = useState([]);
+    const [newPost, setNewPost] = useState('');
     const [isLoading, setIsLoading] = useState(true);
+    const [showReportModal, setShowReportModal] = useState(null);
 
+    const wallTitles = {
+        affirmations: 'Affirmation Wall',
+        public: 'Public Wall',
+        inner_circle: 'My Inner Circle',
+    };
+    
     useEffect(() => {
-        const q = query(collection(db, "affirmations"), orderBy("timestamp", "desc"), limit(50));
+        let q;
+        if (type === 'inner_circle') {
+             const friendsAndSelf = [...(userData.friends || []), user.uid];
+             q = query(collection(db, `walls/${type}/posts`), where('authorId', 'in', friendsAndSelf), orderBy("timestamp", "desc"), limit(50));
+        } else {
+             q = query(collection(db, `walls/${type}/posts`), orderBy("timestamp", "desc"), limit(50));
+        }
+        
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const affirmationsData = [];
+            const postsData = [];
             querySnapshot.forEach((doc) => {
-                affirmationsData.push({ id: doc.id, ...doc.data() });
+                postsData.push({ id: doc.id, ...doc.data() });
             });
-            setAffirmations(affirmationsData);
+            setPosts(postsData);
             setIsLoading(false);
         });
         return () => unsubscribe();
-    }, []);
+    }, [db, type, userData.friends, user.uid]);
 
-    const handlePostAffirmation = async (e) => {
+    const handlePost = async (e) => {
         e.preventDefault();
-        if (newAffirmation.trim() === '' || user.isAnonymous) return;
+        if (newPost.trim() === '' || user.isAnonymous) return;
         
-        const affirmationData = {
-            text: newAffirmation,
+        const postData = {
+            text: newPost,
             authorId: user.uid,
             authorUsername: userData.username,
             authorAvatarSeed: userData.avatarSeed,
             authorAvatarStyle: userData.avatarStyle,
             timestamp: serverTimestamp(),
+            likes: [],
             reports: []
         };
 
         try {
-            await addDoc(collection(db, "affirmations"), affirmationData);
-            setNewAffirmation('');
+            await addDoc(collection(db, `walls/${type}/posts`), postData);
+            setNewPost('');
         } catch (error) {
-            console.error("Error posting affirmation: ", error);
-            setNotification("Failed to post affirmation.", "error");
+            console.error(`Error posting to ${type} wall: `, error);
+            setNotification(`Failed to post to ${type} wall.`, "error");
         }
     };
     
-    const handleDeleteAffirmation = async (affirmationId) => {
-        const affirmationRef = doc(db, 'affirmations', affirmationId);
-        try {
-            await deleteDoc(affirmationRef);
-            setNotification("Affirmation deleted.");
-        } catch (error) {
-            console.error("Error deleting affirmation:", error);
-            setNotification("Failed to delete affirmation.", "error");
-        }
-    };
-
-    const handleReportAffirmation = async (affirmationId) => {
-        const affirmationRef = doc(db, 'affirmations', affirmationId);
+    const handleLike = async (postId) => {
+        const postRef = doc(db, `walls/${type}/posts`, postId);
         try {
             await runTransaction(db, async (transaction) => {
-                const affDoc = await transaction.get(affirmationRef);
-                if (!affDoc.exists()) {
-                    throw new Error("Affirmation no longer exists.");
-                }
-
-                const data = affDoc.data();
-                const reports = data.reports || [];
-
-                if (reports.includes(user.uid)) {
-                    setNotification("You have already reported this post.");
-                    return;
-                }
-
-                if (reports.length >= 2) {
-                    transaction.delete(affirmationRef);
-                    setNotification("Post removed due to multiple reports.");
+                const postDoc = await transaction.get(postRef);
+                if (!postDoc.exists()) { throw "Document does not exist!"; }
+                
+                const likes = postDoc.data().likes || [];
+                if (likes.includes(user.uid)) {
+                    transaction.update(postRef, { likes: arrayRemove(user.uid) });
                 } else {
-                    transaction.update(affirmationRef, { reports: arrayUnion(user.uid) });
-                    setNotification("Post reported. Thank you for your feedback.");
+                    transaction.update(postRef, { likes: arrayUnion(user.uid) });
                 }
             });
         } catch (error) {
-            console.error("Error reporting affirmation:", error);
-            setNotification(error.message || "Failed to report affirmation.", "error");
+             console.error("Error liking post:", error);
+             setNotification("Failed to update like.", "error");
         }
     };
+    
+    const handleReport = async (postId, reason) => {
+        setShowReportModal(null);
+        const postRef = doc(db, `walls/${type}/posts`, postId);
+        try {
+             await runTransaction(db, async (transaction) => {
+                const postDoc = await transaction.get(postRef);
+                if (!postDoc.exists()) { throw "Document does not exist!"; }
 
+                const reports = postDoc.data().reports || [];
+                if (reports.some(r => r.reporterId === user.uid)) {
+                    setNotification("You have already reported this post.", "error");
+                    return;
+                }
+                
+                transaction.update(postRef, { reports: arrayUnion({ reporterId: user.uid, reason }) });
+                setNotification("Post reported. Thank you.", "success");
+            });
+        } catch (error) {
+            console.error("Error reporting post:", error);
+            setNotification("Failed to report post.", "error");
+        }
+    };
+    
     return (
         <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-lg border border-border">
-            <h3 className="text-2xl font-serif text-primary mb-4">Affirmation Wall</h3>
+             <AnimatePresence>
+                {showReportModal && (
+                    <Modal onClose={() => setShowReportModal(null)}>
+                        <h3 className="text-xl font-semibold mb-4 text-primary">Report Post</h3>
+                        <p className="mb-4 text-foreground/80">Please select a reason for reporting this post:</p>
+                        <div className="space-y-2">
+                            {['Harassment or bullying', 'Spam', 'Impersonating someone', 'Inappropriate content'].map(reason => (
+                                <button key={reason} onClick={() => handleReport(showReportModal, reason)} className="w-full text-left p-2 rounded-md hover:bg-foreground/10">{reason}</button>
+                            ))}
+                        </div>
+                    </Modal>
+                )}
+            </AnimatePresence>
+            <h3 className="text-2xl font-serif text-primary mb-4">{wallTitles[type]}</h3>
             {!user.isAnonymous && (
-                <form onSubmit={handlePostAffirmation} className="flex space-x-2 mb-6">
+                <form onSubmit={handlePost} className="flex space-x-2 mb-6">
                     <input 
                         type="text"
-                        value={newAffirmation}
-                        onChange={(e) => setNewAffirmation(e.target.value)}
-                        placeholder="Share a positive thought..."
+                        value={newPost}
+                        onChange={(e) => setNewPost(e.target.value)}
+                        placeholder="Share something..."
                         className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
                     />
-                    <Button type="submit" variant="primary" className="px-4" disabled={!newAffirmation.trim()}><Send size={18}/></Button>
+                    <Button type="submit" variant="primary" className="px-4" disabled={!newPost.trim()}><Send size={18}/></Button>
                 </form>
             )}
             <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
-                {isLoading && <p>Loading affirmations...</p>}
-                {affirmations.map(aff => (
-                    <div key={aff.id} className="bg-background p-4 rounded-lg flex items-start space-x-4">
-                        <img onClick={() => onProfileClick(aff.authorId)} src={API_ENDPOINTS.avatar(aff.authorAvatarSeed, aff.authorAvatarStyle)} alt="avatar" className="w-10 h-10 rounded-full border-2 border-primary/30 cursor-pointer"/>
+                {isLoading && <p>Loading posts...</p>}
+                {posts.map(post => (
+                    <div key={post.id} className="bg-background p-4 rounded-lg flex items-start space-x-4">
+                        <img onClick={() => onProfileClick(post.authorId)} src={API_ENDPOINTS.avatar(post.authorAvatarSeed, post.authorAvatarStyle)} alt="avatar" className="w-10 h-10 rounded-full border-2 border-primary/30 cursor-pointer"/>
                         <div className="flex-grow">
-                            <p onClick={() => onProfileClick(aff.authorId)} className="font-semibold text-foreground cursor-pointer">@{aff.authorUsername}</p>
-                            <p className="text-foreground/90">{aff.text}</p>
-                        </div>
-                        <div className="flex-shrink-0">
-                            {user.uid === aff.authorId ? (
-                                <button onClick={() => handleDeleteAffirmation(aff.id)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-full"><Trash2 size={16}/></button>
-                            ) : (
-                                <button onClick={() => handleReportAffirmation(aff.id)} className="p-2 text-foreground/50 hover:bg-foreground/10 rounded-full"><Flag size={16}/></button>
-                            )}
+                            <p onClick={() => onProfileClick(post.authorId)} className="font-semibold text-foreground cursor-pointer">@{post.authorUsername}</p>
+                            <p className="text-foreground/90">{post.text}</p>
+                            <div className="flex items-center space-x-4 mt-2 text-foreground/60">
+                                <button onClick={() => handleLike(post.id)} className="flex items-center space-x-1 hover:text-red-500">
+                                    <Heart size={16} className={`${post.likes?.includes(user.uid) ? 'text-red-500 fill-current' : ''}`}/>
+                                    <span>{post.likes?.length || 0}</span>
+                                </button>
+                                <button onClick={() => setShowReportModal(post.id)} className="flex items-center space-x-1 hover:text-amber-500"><Flag size={16}/><span>Report</span></button>
+                            </div>
                         </div>
                     </div>
                 ))}
@@ -1581,6 +1736,8 @@ const App = () => {
 
         if (isLoading) return <LoadingSpinner />;
         if (!profileData) return null;
+        
+        const { privacy = {} } = profileData;
 
         return (
             <div className="p-4">
@@ -1588,10 +1745,10 @@ const App = () => {
                 <div className="bg-card p-6 rounded-2xl shadow-lg max-w-md mx-auto text-center border border-border">
                     <img src={API_ENDPOINTS.avatar(profileData.avatarSeed, profileData.avatarStyle)} alt="avatar" className="w-32 h-32 rounded-full mx-auto border-4 border-primary/40 mb-4" />
                     <h2 className="text-2xl font-bold text-foreground">@{profileData.username}</h2>
-                    {profileData.isNamePublic && <p className="text-xl text-foreground/80">{profileData.preferredName}</p>}
-                    {profileData.isPronounsPublic && <p className="text-sm text-foreground/60">{profileData.pronouns}</p>}
-                    {profileData.isZodiacPublic && <p className="text-sm text-foreground/60">{profileData.zodiac}</p>}
-                    {profileData.isBioPublic && <p className="mt-4 text-foreground/90">{profileData.bio}</p>}
+                     <p className="text-xl text-foreground/80">{profileData.preferredName}</p>
+                    {privacy.pronouns && <p className="text-sm text-foreground/60">{profileData.pronouns}</p>}
+                    {privacy.zodiac && <p className="text-sm text-foreground/60">{profileData.zodiac}</p>}
+                    {privacy.bio && <p className="mt-4 text-foreground/90">{profileData.bio}</p>}
                 </div>
             </div>
         );
@@ -1606,7 +1763,7 @@ const App = () => {
             return <ChatWrapper user={user} friend={chattingWith} onBack={() => setChattingWith(null)} />;
         }
 
-        if (userData?.isAnonymous && (currentView === 'community' || currentView === 'ouija' || currentView === 'past_readings' || currentView === 'profile' || currentView === 'public_profile')) {
+        if (userData?.isAnonymous && (currentView === 'community' || currentView === 'ouija' || currentView === 'past_readings' || currentView === 'profile' || currentView === 'public_profile' || currentView === 'natal_chart')) {
             return <Dashboard navigate={navigate} userData={userData}/>;
         }
 
@@ -1615,6 +1772,7 @@ const App = () => {
             case 'horoscope': return <Horoscope zodiac={userData?.zodiac} />;
             case 'tarot': return <TarotReading user={user} showNotification={showNotification} />;
             case 'profile': return <Profile user={user} userData={userData} showNotification={showNotification} />;
+            case 'natal_chart': return <NatalChart userData={userData} showNotification={showNotification} />;
             case 'public_profile': return <PublicProfileView profileUid={currentData.uid} onBack={back} />;
             case 'past_readings': return <PastReadings user={user} userData={userData} showNotification={showNotification} onCardClick={(card) => { console.log("Card clicked:", card)}} />;
             case 'community': return <CommunityHub user={user} userData={userData} setChattingWith={setChattingWith} showNotification={showNotification} onProfileClick={(uid) => navigate('public_profile', { uid })}/>;
