@@ -1,0 +1,44 @@
+name: llm-code-review
+on:
+  workflow_dispatch:
+    branches: '*'
+  pull_request:
+    branches: [develop]
+  pull_request_target:
+    branches: '*'
+
+jobs:
+  llm-code-review:
+    runs-on: ubuntu-latest
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+      GH_API_KEY: ${{ secrets.GH_API_KEY }}
+    permissions:
+      pull-requests: write
+
+    steps:
+
+    - name: "Check if we want pull_request or pull_request_target"
+      shell: bash
+      run: |
+        if [ ${{ github.event_name }} == 'pull_request' ]; then
+          if [ ${{ github.event.pull_request.head.repo.owner.login }} == ${{ github.repository_owner }} ]; then
+            echo CONTINUE=true >> $GITHUB_ENV
+          fi
+        elif [ ${{ github.event_name }} == 'pull_request_target' ]; then
+          if [ ${{ github.event.pull_request.head.repo.owner.login }} != ${{ github.repository_owner }} ]; then
+            echo CONTINUE=true >> $GITHUB_ENV
+          fi
+        elif [ ${{ github.event_name }} == 'workflow_dispatch' ]; then
+          echo CONTINUE=true >> $GITHUB_ENV
+        fi
+
+    - name: "Code review"
+      uses: NOAA-EMC/ci-llm-code-review@develop
+      if: ${{ env.CONTINUE == 'true' }}
+      with:
+        # Modify these inputs to select a model/API
+        backend: gh-phi-4
+        api-key-variable: GH_API_KEY
+        github-token: ${{ github.token }}
