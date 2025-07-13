@@ -30,11 +30,9 @@ const AccountSetup = ({ user, db, onSetupComplete }) => {
 
     const [preferredName, setPreferredName] = useState('');
     const [pronouns, setPronouns] = useState('');
-    // --- ADDITIONS START ---
     const [birthDate, setBirthDate] = useState('');
     const [birthTime, setBirthTime] = useState('');
     const [birthLocation, setBirthLocation] = useState('');
-    // --- ADDITIONS END ---
     const [zodiac, setZodiac] = useState('Aries');
     const [bio, setBio] = useState('');
     const [avatarSeed, setAvatarSeed] = useState(user.uid);
@@ -110,11 +108,9 @@ const AccountSetup = ({ user, db, onSetupComplete }) => {
                 username,
                 preferredName,
                 pronouns,
-                // --- ADDITIONS START ---
-                dob: birthDate,
+                birthDate,
                 birthTime,
                 birthLocation,
-                // --- ADDITIONS END ---
                 zodiac,
                 bio,
                 avatarSeed,
@@ -169,7 +165,6 @@ const AccountSetup = ({ user, db, onSetupComplete }) => {
                                 <label htmlFor="preferredName" className="text-foreground/80 mb-1 block text-sm">Preferred Name *</label>
                                 <input id="preferredName" type="text" value={preferredName} onChange={(e) => setPreferredName(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors" required />
                             </div>
-                            {/* --- ADDITIONS START --- */}
                             <div>
                                 <label htmlFor="birthDate" className="text-foreground/80 mb-1 block text-sm">Birth Date *</label>
                                 <input id="birthDate" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors" required />
@@ -182,7 +177,6 @@ const AccountSetup = ({ user, db, onSetupComplete }) => {
                                 <label htmlFor="birthLocation" className="text-foreground/80 mb-1 block text-sm">Birth Location (City, Country) *</label>
                                 <input id="birthLocation" type="text" value={birthLocation} onChange={(e) => setBirthLocation(e.target.value)} placeholder="e.g., New York, USA" className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors" required />
                             </div>
-                            {/* --- ADDITIONS END --- */}
                             <div>
                                 <label htmlFor="pronouns" className="text-foreground/80 mb-1 block text-sm">Pronouns</label>
                                 <input id="pronouns" type="text" value={pronouns} onChange={(e) => setPronouns(e.target.value)} placeholder="e.g., she/her, they/them" className="bg-input text-foreground p-3 rounded-lg w-full border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors" />
@@ -261,5 +255,4 @@ const AccountSetup = ({ user, db, onSetupComplete }) => {
         </div>
     );
 };
-
 export default AccountSetup;
